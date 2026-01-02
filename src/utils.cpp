@@ -3,6 +3,15 @@
 #include <random>
 #include <cctype>
 
+// Static random number generator for utilities
+static std::mt19937 rng;
+static bool rng_seeded = false;
+
+void seed_random(unsigned int seed) {
+    rng.seed(seed);
+    rng_seeded = true;
+}
+
 void print_tape(
     const std::vector<uint8_t>& tape,
     int head0_pos,
@@ -50,14 +59,19 @@ std::vector<uint8_t> mutate(
         return tape;
     }
 
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_real_distribution<> dis(0.0, 1.0);
-    static std::uniform_int_distribution<> byte_dis(0, 255);
+    // Initialize with random_device if not seeded
+    if (!rng_seeded) {
+        std::random_device rd;
+        rng.seed(rd());
+        rng_seeded = true;
+    }
+
+    std::uniform_real_distribution<> dis(0.0, 1.0);
+    std::uniform_int_distribution<> byte_dis(0, 255);
 
     for (size_t i = 0; i < tape.size(); i++) {
-        if (dis(gen) < mutation_rate) {
-            tape[i] = static_cast<uint8_t>(byte_dis(gen));
+        if (dis(rng) < mutation_rate) {
+            tape[i] = static_cast<uint8_t>(byte_dis(rng));
         }
     }
 
@@ -65,13 +79,18 @@ std::vector<uint8_t> mutate(
 }
 
 std::vector<uint8_t> generate_random_program(int length) {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<> dis(0, 255);
+    // Initialize with random_device if not seeded
+    if (!rng_seeded) {
+        std::random_device rd;
+        rng.seed(rd());
+        rng_seeded = true;
+    }
+
+    std::uniform_int_distribution<> dis(0, 255);
 
     std::vector<uint8_t> program(length);
     for (int i = 0; i < length; i++) {
-        program[i] = static_cast<uint8_t>(dis(gen));
+        program[i] = static_cast<uint8_t>(dis(rng));
     }
     return program;
 }
