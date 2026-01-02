@@ -40,8 +40,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Set random seed
-    std::srand(config.random_seed);
+    // Set random seed for reproducibility
+    seed_random(config.random_seed);
     std::mt19937 rng(config.random_seed);
 
     // Initialize soup with random programs

@@ -21,6 +21,8 @@ void print_tape(
     bool skip_non_instruction = true
 );
 
+void seed_random(unsigned int seed);
+
 std::vector<uint8_t> mutate(
     std::vector<uint8_t> tape,
     double mutation_rate = 0.0
