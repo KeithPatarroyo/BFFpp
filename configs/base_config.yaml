@@ -1,0 +1,9 @@
+random_seed: 52
+soup_size: 16384
+program_size: 64
+epochs: 100000
+mutation_rate: 0.00012
+read_head_position: 0
+write_head_position: 64
+eval_interval: 10
+num_print_programs: 10
