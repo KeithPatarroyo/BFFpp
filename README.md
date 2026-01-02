@@ -77,6 +77,16 @@ make
 # The executable 'bffpp' will be created in the build directory
 ```
 
+## Testing
+
+A test executable is provided to verify the emulator works correctly:
+
+```bash
+./build/test_emulator
+```
+
+This runs the test case from the original Python implementation, showing verbose execution output with color-coded tape positions (blue=read head, red=write head, green=program counter).
+
 ## Usage
 
 Run the simulation with a configuration file:

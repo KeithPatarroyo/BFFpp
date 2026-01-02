@@ -32,3 +32,16 @@ target_compile_options(bffpp PRIVATE ${BROTLI_CFLAGS_OTHER})
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(bffpp PRIVATE -Wall -Wextra -O3)
 endif()
+
+# Test executable
+add_executable(test_emulator
+    src/test_emulator.cpp
+    src/emulator.cpp
+    src/utils.cpp
+)
+
+# Link libraries for test
+target_link_libraries(test_emulator pthread)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_emulator PRIVATE -Wall -Wextra -O3)
+endif()
