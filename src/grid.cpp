@@ -4,6 +4,8 @@
 #include <sstream>
 #include <cmath>
 #include <iomanip>
+#include <random>
+#include <algorithm>
 
 Grid::Grid(int width, int height, int program_size)
     : width(width), height(height), program_size(program_size) {
@@ -245,4 +247,88 @@ std::string Grid::to_json(int epoch, double entropy, double avg_iters, double fi
     json << "]}";
 
     return json.str();
+}
+
+std::vector<Grid::Cell> Grid::get_von_neumann_neighbors(int x, int y, int radius) const {
+    std::vector<Cell> neighbors;
+
+    // Iterate through all possible cells within Manhattan distance
+    for (int dy = -radius; dy <= radius; dy++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            // Calculate Manhattan distance
+            int manhattan_dist = std::abs(dx) + std::abs(dy);
+
+            // Skip if outside radius or is the cell itself
+            if (manhattan_dist == 0 || manhattan_dist > radius) {
+                continue;
+            }
+
+            int nx = x + dx;
+            int ny = y + dy;
+
+            // Check bounds
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                neighbors.push_back(Cell{nx, ny});
+            }
+        }
+    }
+
+    return neighbors;
+}
+
+std::vector<std::pair<int, int>> Grid::create_spatial_pairs(int neighborhood_radius) {
+    int total_cells = width * height;
+    std::vector<std::pair<int, int>> pairs;
+    std::vector<bool> taken(total_cells, false);
+
+    // Create a random order to visit cells
+    std::vector<int> cell_order(total_cells);
+    for (int i = 0; i < total_cells; i++) {
+        cell_order[i] = i;
+    }
+
+    // Get RNG from utils (use shared RNG for reproducibility)
+    std::mt19937& rng = get_rng();
+    std::shuffle(cell_order.begin(), cell_order.end(), rng);
+
+    // Process cells in random order
+    for (int cell_idx : cell_order) {
+        // Skip if already taken
+        if (taken[cell_idx]) {
+            continue;
+        }
+
+        // Convert flat index to x, y
+        int y = cell_idx / width;
+        int x = cell_idx % width;
+
+        // Get neighbors
+        std::vector<Cell> neighbors = get_von_neumann_neighbors(x, y, neighborhood_radius);
+
+        // Filter to only untaken neighbors
+        std::vector<int> available_neighbors;
+        for (const Cell& neighbor : neighbors) {
+            int neighbor_idx = index(neighbor.x, neighbor.y);
+            if (!taken[neighbor_idx]) {
+                available_neighbors.push_back(neighbor_idx);
+            }
+        }
+
+        // If there are available neighbors, pick one randomly
+        if (!available_neighbors.empty()) {
+            std::uniform_int_distribution<int> dist(0, available_neighbors.size() - 1);
+            int chosen_idx = available_neighbors[dist(rng)];
+
+            // Mark both as taken and add pair
+            taken[cell_idx] = true;
+            taken[chosen_idx] = true;
+            pairs.push_back({cell_idx, chosen_idx});
+        } else {
+            // No available neighbors - mark as mutation-only
+            taken[cell_idx] = true;
+            pairs.push_back({-1, cell_idx});
+        }
+    }
+
+    return pairs;
 }
