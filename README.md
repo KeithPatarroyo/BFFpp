@@ -116,7 +116,7 @@ For quick testing with a smaller grid:
 ./build/bffpp_grid --config configs/grid_test_config.yaml
 ```
 
-The grid simulation creates HTML visualizations in `data/visualizations/` that show the evolution of programs as a colorful grid. Each program is represented by a pixel colored according to its first 3 bytes (RGB). Open the HTML files in your browser to view the grid state at different epochs.
+The grid simulation creates HTML visualizations in `data/visualizations/` that show the evolution of programs as a colorful grid. Each program is represented by a pixel colored according to its instruction composition (see Color Scheme below). Open the HTML files in your browser to view the grid state at different epochs.
 
 **Grid Configurations:**
 - `grid_config.yaml`: 240×135 grid (32,400 programs) - matches the paper
