@@ -101,6 +101,26 @@ Or use the default configuration:
 ./build/bffpp --config configs/small_config.yaml
 ```
 
+### Grid-Based Visualization
+
+Run the grid-based simulation with real-time HTML visualization:
+
+```bash
+./build/bffpp_grid --config configs/grid_config.yaml
+```
+
+For quick testing with a smaller grid:
+
+```bash
+./build/bffpp_grid --config configs/grid_test_config.yaml
+```
+
+The grid simulation creates HTML visualizations in `data/visualizations/` that show the evolution of programs as a colorful grid. Each program is represented by a pixel colored according to its first 3 bytes (RGB). Open the HTML files in your browser to view the grid state at different epochs.
+
+**Grid Configurations:**
+- `grid_config.yaml`: 240×135 grid (32,400 programs) - matches the paper
+- `grid_test_config.yaml`: 40×30 grid (1,200 programs) - for quick testing
+
 ## Configuration Parameters
 
 Configuration files (YAML format) support the following parameters:
@@ -114,6 +134,13 @@ Configuration files (YAML format) support the following parameters:
 - `write_head_position`: Initial position of write head
 - `eval_interval`: Print statistics every N epochs
 - `num_print_programs`: Number of programs to print when HOE > 1.0
+
+**Grid-specific parameters:**
+- `grid_width`: Width of the grid (number of columns)
+- `grid_height`: Height of the grid (number of rows)
+- `visualization_interval`: Save visualization every N epochs
+
+When using grid mode, `soup_size` is automatically set to `grid_width × grid_height`.
 
 ## Instruction Set
 

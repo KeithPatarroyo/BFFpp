@@ -6,6 +6,13 @@
 
 Config load_config(const std::string& filename) {
     Config config;
+
+    // Set defaults
+    config.use_grid = false;
+    config.grid_width = 0;
+    config.grid_height = 0;
+    config.visualization_interval = 100;
+
     std::ifstream file(filename);
 
     if (!file.is_open()) {
@@ -53,7 +60,22 @@ Config load_config(const std::string& filename) {
             config.eval_interval = std::stoi(value);
         } else if (key == "num_print_programs") {
             config.num_print_programs = std::stoi(value);
+        } else if (key == "grid_width") {
+            config.grid_width = std::stoi(value);
+            config.use_grid = true;
+        } else if (key == "grid_height") {
+            config.grid_height = std::stoi(value);
+            config.use_grid = true;
+        } else if (key == "use_grid") {
+            config.use_grid = (value == "true" || value == "1" || value == "yes");
+        } else if (key == "visualization_interval") {
+            config.visualization_interval = std::stoi(value);
         }
+    }
+
+    // If using grid, override soup_size
+    if (config.use_grid && config.grid_width > 0 && config.grid_height > 0) {
+        config.soup_size = config.grid_width * config.grid_height;
     }
 
     file.close();
