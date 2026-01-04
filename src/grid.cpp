@@ -166,3 +166,34 @@ void Grid::save_html(const std::string& filename) const {
 
     file.close();
 }
+
+std::string Grid::to_json(int epoch, double entropy, double avg_iters, double finished_ratio) const {
+    std::ostringstream json;
+
+    json << "{";
+    json << "\"epoch\":" << epoch << ",";
+    json << "\"width\":" << width << ",";
+    json << "\"height\":" << height << ",";
+    json << "\"entropy\":" << std::fixed << std::setprecision(6) << entropy << ",";
+    json << "\"avg_iters\":" << std::fixed << std::setprecision(3) << avg_iters << ",";
+    json << "\"finished_ratio\":" << std::fixed << std::setprecision(6) << finished_ratio << ",";
+    json << "\"grid\":[";
+
+    // Write grid data as JSON array
+    for (int y = 0; y < height; y++) {
+        json << "[";
+        for (int x = 0; x < width; x++) {
+            RGB color = program_to_color(get_program(x, y));
+            json << "[" << static_cast<int>(color.r) << ","
+                 << static_cast<int>(color.g) << ","
+                 << static_cast<int>(color.b) << "]";
+            if (x < width - 1) json << ",";
+        }
+        json << "]";
+        if (y < height - 1) json << ",";
+    }
+
+    json << "]}";
+
+    return json.str();
+}

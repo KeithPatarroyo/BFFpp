@@ -3,6 +3,7 @@
 #include "metrics.h"
 #include "config.h"
 #include "grid.h"
+#include "websocket_server.h"
 
 #include <iostream>
 #include <vector>
@@ -59,6 +60,13 @@ int main(int argc, char* argv[]) {
     std::cout << "  Visualization interval: " << config.visualization_interval << std::endl;
     std::cout << std::endl;
 
+    // Start WebSocket server for live visualization
+    WebSocketServer ws_server(8080);
+    ws_server.start();
+    std::cout << "WebSocket server started on port 8080" << std::endl;
+    std::cout << "Open data/live_visualization.html in your browser for real-time updates" << std::endl;
+    std::cout << std::endl;
+
     // Create output directories
     system("mkdir -p data/visualizations");
 
@@ -67,6 +75,10 @@ int main(int argc, char* argv[]) {
     filename << "data/visualizations/grid_epoch_0000.html";
     grid.save_html(filename.str());
     std::cout << "Saved initial visualization: " << filename.str() << std::endl;
+
+    // Send initial state via WebSocket
+    std::string json_data = grid.to_json(0, 0.0, 0.0, 0.0);
+    ws_server.broadcast(json_data);
 
     // Main simulation loop
     for (int epoch = 0; epoch < config.epochs; epoch++) {
@@ -155,24 +167,32 @@ int main(int argc, char* argv[]) {
         // Update grid with new programs
         grid.set_all_programs(soup);
 
+        // Calculate stats
+        std::vector<uint8_t> flat_soup;
+        for (const auto& program : soup) {
+            flat_soup.insert(flat_soup.end(), program.begin(), program.end());
+        }
+        double hoe = higher_order_entropy(flat_soup);
+
+        // Broadcast live update via WebSocket
+        if (ws_server.has_clients()) {
+            std::string json_data = grid.to_json(epoch + 1, hoe, total_iterations, finished_runs);
+            ws_server.broadcast(json_data);
+        }
+
         // Evaluate and print statistics
         if (epoch % config.eval_interval == 0) {
-            // Flatten soup
-            std::vector<uint8_t> flat_soup;
-            for (const auto& program : soup) {
-                flat_soup.insert(flat_soup.end(), program.begin(), program.end());
-            }
-
-            double hoe = higher_order_entropy(flat_soup);
-
             std::cout << "Epoch: " << epoch << std::endl;
             std::cout << std::fixed << std::setprecision(3);
             std::cout << "\tHigher Order Entropy=" << hoe
                       << ",\tAvg Iters=" << total_iterations
                       << ",\tAvg Skips=" << total_skipped
                       << ",\tFinished Ratio=" << finished_runs
-                      << ",\tTerminated Ratio=" << terminated_runs
-                      << std::endl;
+                      << ",\tTerminated Ratio=" << terminated_runs;
+            if (ws_server.has_clients()) {
+                std::cout << ",\tWebSocket Clients=" << ws_server.get_client_count();
+            }
+            std::cout << std::endl;
         }
 
         // Save visualization periodically
