@@ -43,6 +43,21 @@ public:
     // Serialize grid to JSON for WebSocket
     std::string to_json(int epoch, double entropy, double avg_iters, double finished_ratio) const;
 
+    // Spatial pairing methods
+    struct Cell {
+        int x;
+        int y;
+        int index() const { return -1; } // Placeholder, actual index computed by Grid
+    };
+
+    // Get Von Neumann neighborhood (Manhattan distance <= r)
+    std::vector<Cell> get_von_neumann_neighbors(int x, int y, int radius = 2) const;
+
+    // Create spatial pairs using Von Neumann neighborhoods
+    // Returns vector of pairs: (cell_index1, cell_index2)
+    // Cells without available neighbors return (-1, cell_index) to indicate mutation-only
+    std::vector<std::pair<int, int>> create_spatial_pairs(int neighborhood_radius = 2);
+
     // Getters
     int get_width() const { return width; }
     int get_height() const { return height; }

@@ -12,6 +12,16 @@ void seed_random(unsigned int seed) {
     rng_seeded = true;
 }
 
+std::mt19937& get_rng() {
+    // Initialize with random_device if not seeded
+    if (!rng_seeded) {
+        std::random_device rd;
+        rng.seed(rd());
+        rng_seeded = true;
+    }
+    return rng;
+}
+
 void print_tape(
     const std::vector<uint8_t>& tape,
     int head0_pos,

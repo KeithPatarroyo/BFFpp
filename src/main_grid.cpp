@@ -45,7 +45,6 @@ int main(int argc, char* argv[]) {
 
     // Set random seed for reproducibility
     seed_random(config.random_seed);
-    std::mt19937 rng(config.random_seed);
 
     // Create and initialize grid
     Grid grid(config.grid_width, config.grid_height, config.program_size);
@@ -82,21 +81,11 @@ int main(int argc, char* argv[]) {
 
     // Main simulation loop
     for (int epoch = 0; epoch < config.epochs; epoch++) {
-        // Get all programs as flat vector (fully-connected topology for now)
+        // Get all programs as flat vector
         std::vector<std::vector<uint8_t>> soup = grid.get_all_programs();
 
-        // Create random permutation
-        std::vector<int> perm(soup.size());
-        for (size_t i = 0; i < soup.size(); i++) {
-            perm[i] = i;
-        }
-        std::shuffle(perm.begin(), perm.end(), rng);
-
-        // Create program pairs
-        std::vector<std::pair<int, int>> program_pairs;
-        for (size_t i = 0; i < soup.size(); i += 2) {
-            program_pairs.push_back({perm[i], perm[i + 1]});
-        }
+        // Create spatial pairs using Von Neumann neighborhoods (r=2)
+        std::vector<std::pair<int, int>> program_pairs = grid.create_spatial_pairs(2);
 
         // Run simulations with multithreading
         std::vector<EmulatorResult> results(program_pairs.size());
@@ -108,6 +97,11 @@ int main(int argc, char* argv[]) {
         for (size_t i = 0; i < program_pairs.size(); i++) {
             int idx_a = program_pairs[i].first;
             int idx_b = program_pairs[i].second;
+
+            // Skip mutation-only cases for now (handle in result processing)
+            if (idx_a == -1) {
+                continue;
+            }
 
             // Wait if too many threads are running
             if (threads.size() >= num_threads) {
@@ -134,10 +128,19 @@ int main(int argc, char* argv[]) {
         double total_skipped = 0;
         double finished_runs = 0;
         double terminated_runs = 0;
+        int executed_pairs = 0;
 
         for (size_t i = 0; i < program_pairs.size(); i++) {
             int idx_a = program_pairs[i].first;
             int idx_b = program_pairs[i].second;
+
+            // Handle mutation-only cases (no neighbor available)
+            if (idx_a == -1) {
+                // Just mutate the program without execution
+                soup[idx_b] = mutate(soup[idx_b], config.mutation_rate);
+                continue;
+            }
+
             const EmulatorResult& result = results[i];
 
             // Extract and mutate programs
@@ -157,12 +160,16 @@ int main(int argc, char* argv[]) {
             total_skipped += result.skipped;
             finished_runs += (result.state == "Finished") ? 1.0 : 0.0;
             terminated_runs += (result.state == "Terminated") ? 1.0 : 0.0;
+            executed_pairs++;
         }
 
-        total_skipped /= program_pairs.size();
-        total_iterations /= program_pairs.size();
-        terminated_runs /= program_pairs.size();
-        finished_runs /= program_pairs.size();
+        // Calculate averages (only for executed pairs)
+        if (executed_pairs > 0) {
+            total_skipped /= executed_pairs;
+            total_iterations /= executed_pairs;
+            terminated_runs /= executed_pairs;
+            finished_runs /= executed_pairs;
+        }
 
         // Update grid with new programs
         grid.set_all_programs(soup);

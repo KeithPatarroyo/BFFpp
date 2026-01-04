@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdint>
 #include <string>
+#include <random>
 
 namespace bcolors {
     const std::string RED = "\033[0;30;41m";
@@ -22,6 +23,9 @@ void print_tape(
 );
 
 void seed_random(unsigned int seed);
+
+// Get reference to shared RNG for reproducibility
+std::mt19937& get_rng();
 
 std::vector<uint8_t> mutate(
     std::vector<uint8_t> tape,
