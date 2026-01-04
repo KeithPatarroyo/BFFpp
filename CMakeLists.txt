@@ -45,3 +45,21 @@ target_link_libraries(test_emulator pthread)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_emulator PRIVATE -Wall -Wextra -O3)
 endif()
+
+# Grid-based simulation executable
+add_executable(bffpp_grid
+    src/main_grid.cpp
+    src/emulator.cpp
+    src/utils.cpp
+    src/metrics.cpp
+    src/config.cpp
+    src/grid.cpp
+)
+
+# Link libraries for grid
+target_link_libraries(bffpp_grid ${BROTLI_LIBRARIES} pthread)
+target_include_directories(bffpp_grid PRIVATE ${BROTLI_INCLUDE_DIRS})
+target_compile_options(bffpp_grid PRIVATE ${BROTLI_CFLAGS_OTHER})
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(bffpp_grid PRIVATE -Wall -Wextra -O3)
+endif()

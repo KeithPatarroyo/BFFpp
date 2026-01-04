@@ -13,6 +13,12 @@ struct Config {
     int write_head_position;
     int eval_interval;
     int num_print_programs;
+
+    // Grid parameters
+    int grid_width;
+    int grid_height;
+    bool use_grid;
+    int visualization_interval;
 };
 
 Config load_config(const std::string& filename);
