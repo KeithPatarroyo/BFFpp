@@ -150,6 +150,23 @@ The `bffpp_grid` executable includes a built-in WebSocket server for **real-time
 
 The live view updates continuously as the simulation runs, allowing you to observe the emergence of self-replicating patterns in real-time.
 
+### Color Scheme
+
+The visualization uses **semantic coloring** based on the CuBFF implementation, where program colors reflect their instruction composition:
+
+- **Green** `rgb(0, 192, 0)` - Loop operations (`[` `]`)
+- **Magenta** `rgb(200, 0, 200)` - Arithmetic and copy operations (`+` `-` `.` `,`)
+- **Light Purple** `rgb(200, 128, 220)` - Head movement operations (`<` `>` `{` `}`)
+- **Red** `rgb(255, 0, 0)` - Invalid/null bytes (non-instructions)
+
+Programs are colored as weighted averages based on their instruction type frequencies, creating a visual representation of program "behavior":
+- Programs with many loops appear **greenish**
+- Programs focused on data manipulation appear **magenta**
+- Programs with lots of head movement appear **purple**
+- Dormant/junk programs appear **reddish**
+
+This allows you to visually identify different program "species" and observe behavioral patterns as evolution progresses.
+
 ## Configuration Parameters
 
 Configuration files (YAML format) support the following parameters:
