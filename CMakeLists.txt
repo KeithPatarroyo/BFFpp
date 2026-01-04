@@ -46,6 +46,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_emulator PRIVATE -Wall -Wextra -O3)
 endif()
 
+# Find OpenSSL for WebSocket
+find_package(OpenSSL REQUIRED)
+
 # Grid-based simulation executable
 add_executable(bffpp_grid
     src/main_grid.cpp
@@ -54,10 +57,11 @@ add_executable(bffpp_grid
     src/metrics.cpp
     src/config.cpp
     src/grid.cpp
+    src/websocket_server.cpp
 )
 
 # Link libraries for grid
-target_link_libraries(bffpp_grid ${BROTLI_LIBRARIES} pthread)
+target_link_libraries(bffpp_grid ${BROTLI_LIBRARIES} pthread OpenSSL::SSL OpenSSL::Crypto)
 target_include_directories(bffpp_grid PRIVATE ${BROTLI_INCLUDE_DIRS})
 target_compile_options(bffpp_grid PRIVATE ${BROTLI_CFLAGS_OTHER})
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")

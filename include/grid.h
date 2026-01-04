@@ -40,6 +40,9 @@ public:
     // Generate HTML visualization
     void save_html(const std::string& filename) const;
 
+    // Serialize grid to JSON for WebSocket
+    std::string to_json(int epoch, double entropy, double avg_iters, double finished_ratio) const;
+
     // Getters
     int get_width() const { return width; }
     int get_height() const { return height; }

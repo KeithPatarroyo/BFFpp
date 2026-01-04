@@ -41,6 +41,7 @@ BFFpp/
 - C++17 compatible compiler (GCC 7+, Clang 5+, MSVC 2017+)
 - CMake 3.10 or higher
 - Brotli compression library
+- OpenSSL (for WebSocket support)
 - pthread (usually included with your compiler)
 
 ### Installing Dependencies
@@ -48,17 +49,17 @@ BFFpp/
 **Ubuntu/Debian:**
 ```bash
 sudo apt-get update
-sudo apt-get install build-essential cmake libbrotli-dev pkg-config
+sudo apt-get install build-essential cmake libbrotli-dev libssl-dev pkg-config
 ```
 
 **Fedora/RHEL:**
 ```bash
-sudo dnf install gcc-c++ cmake brotli-devel pkgconfig
+sudo dnf install gcc-c++ cmake brotli-devel openssl-devel pkgconfig
 ```
 
 **macOS (with Homebrew):**
 ```bash
-brew install cmake brotli pkg-config
+brew install cmake brotli openssl pkg-config
 ```
 
 ## Building
@@ -120,6 +121,34 @@ The grid simulation creates HTML visualizations in `data/visualizations/` that s
 **Grid Configurations:**
 - `grid_config.yaml`: 240×135 grid (32,400 programs) - matches the paper
 - `grid_test_config.yaml`: 40×30 grid (1,200 programs) - for quick testing
+- `grid_live_test.yaml`: 20×15 grid (300 programs) - minimal config for live testing
+
+### Real-Time Live Visualization 🔴 LIVE
+
+The `bffpp_grid` executable includes a built-in WebSocket server for **real-time visualization** of the evolving grid:
+
+1. Start the simulation:
+   ```bash
+   ./build/bffpp_grid --config configs/grid_live_test.yaml
+   ```
+
+2. Open `data/live_visualization.html` in your browser
+
+3. Watch the grid evolve in real-time! The visualization shows:
+   - Live grid updates every epoch
+   - Current epoch and entropy metrics
+   - FPS (frames per second)
+   - Number of connected WebSocket clients
+   - Auto-reconnection if connection is lost
+
+**Features:**
+- WebSocket server on port 8080
+- Automatic grid scaling to fit your browser window
+- Matrix-style terminal aesthetics
+- No manual page refresh needed
+- Multiple browsers can connect simultaneously
+
+The live view updates continuously as the simulation runs, allowing you to observe the emergence of self-replicating patterns in real-time.
 
 ## Configuration Parameters
 
