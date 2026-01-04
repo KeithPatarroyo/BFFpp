@@ -60,6 +60,34 @@
             font-weight: bold;
         }
 
+        .visualization-area {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+            min-height: 0;
+        }
+
+        .grid-section {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .plot-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 300px;
+        }
+
+        .section-title {
+            color: #00ff00;
+            font-size: 14px;
+            margin-bottom: 5px;
+            text-align: center;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
         .canvas-container {
             flex: 1;
             border: 2px solid #00ff00;
@@ -70,13 +98,19 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 10px;
         }
 
-        canvas {
+        #grid-canvas {
             image-rendering: pixelated;
             image-rendering: crisp-edges;
             max-width: 100%;
             max-height: 100%;
+        }
+
+        #plot-canvas {
+            width: 100%;
+            height: 100%;
         }
 
         .status {
@@ -87,6 +121,7 @@
             border-radius: 5px;
             font-weight: bold;
             font-size: 14px;
+            z-index: 1000;
         }
 
         .status.connected {
@@ -156,16 +191,30 @@
             </div>
         </div>
 
-        <div class="canvas-container">
-            <canvas id="canvas"></canvas>
+        <div class="visualization-area">
+            <div class="grid-section">
+                <div class="section-title">PROGRAM GRID</div>
+                <div class="canvas-container">
+                    <canvas id="grid-canvas"></canvas>
+                </div>
+            </div>
+
+            <div class="plot-section">
+                <div class="section-title">ENTROPY EVOLUTION</div>
+                <div class="canvas-container">
+                    <canvas id="plot-canvas"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="status disconnected" id="status">DISCONNECTED</div>
 
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
+        const gridCanvas = document.getElementById('grid-canvas');
+        const gridCtx = gridCanvas.getContext('2d');
+        const plotCanvas = document.getElementById('plot-canvas');
+        const plotCtx = plotCanvas.getContext('2d');
         const statusDiv = document.getElementById('status');
 
         let gridWidth = 0;
@@ -175,6 +224,10 @@
         let updateCount = 0;
         let lastUpdateTime = Date.now();
         let fps = 0;
+
+        // Entropy history for plotting
+        const entropyHistory = [];
+        const maxHistoryLength = 500;
 
         function connect() {
             ws = new WebSocket('ws://localhost:8080');
@@ -224,14 +277,14 @@
                 gridHeight = data.height;
 
                 // Calculate scale to fit screen
-                const containerWidth = canvas.parentElement.clientWidth - 20;
-                const containerHeight = canvas.parentElement.clientHeight - 20;
+                const containerWidth = gridCanvas.parentElement.clientWidth - 20;
+                const containerHeight = gridCanvas.parentElement.clientHeight - 20;
                 const scaleX = Math.floor(containerWidth / gridWidth);
                 const scaleY = Math.floor(containerHeight / gridHeight);
                 scale = Math.max(1, Math.min(scaleX, scaleY));
 
-                canvas.width = gridWidth * scale;
-                canvas.height = gridHeight * scale;
+                gridCanvas.width = gridWidth * scale;
+                gridCanvas.height = gridHeight * scale;
 
                 console.log(`Grid: ${gridWidth}x${gridHeight}, Scale: ${scale}`);
             }
@@ -246,9 +299,25 @@
             document.getElementById('finished-ratio').textContent = (data.finished_ratio || 0).toFixed(3);
             document.getElementById('updates').textContent = updateCount;
 
-            // Blink effect on canvas
-            canvas.parentElement.classList.add('blink');
-            setTimeout(() => canvas.parentElement.classList.remove('blink'), 100);
+            // Add to entropy history
+            if (data.epoch !== undefined && data.entropy !== undefined) {
+                entropyHistory.push({
+                    epoch: data.epoch,
+                    entropy: data.entropy
+                });
+
+                // Limit history length
+                if (entropyHistory.length > maxHistoryLength) {
+                    entropyHistory.shift();
+                }
+
+                // Draw entropy plot
+                drawEntropyPlot();
+            }
+
+            // Blink effect on grid canvas
+            gridCanvas.parentElement.classList.add('blink');
+            setTimeout(() => gridCanvas.parentElement.classList.remove('blink'), 100);
 
             // Draw grid
             if (data.grid && data.grid.length > 0) {
@@ -261,24 +330,113 @@
                 for (let x = 0; x < gridWidth; x++) {
                     if (gridData[y] && gridData[y][x]) {
                         const [r, g, b] = gridData[y][x];
-                        ctx.fillStyle = `rgb(${r},${g},${b})`;
-                        ctx.fillRect(x * scale, y * scale, scale, scale);
+                        gridCtx.fillStyle = `rgb(${r},${g},${b})`;
+                        gridCtx.fillRect(x * scale, y * scale, scale, scale);
                     }
                 }
             }
         }
 
+        function drawEntropyPlot() {
+            if (entropyHistory.length === 0) return;
+
+            // Resize plot canvas to fit container
+            const container = plotCanvas.parentElement;
+            plotCanvas.width = container.clientWidth - 20;
+            plotCanvas.height = container.clientHeight - 20;
+
+            const width = plotCanvas.width;
+            const height = plotCanvas.height;
+            const padding = 40;
+
+            // Clear canvas
+            plotCtx.fillStyle = '#000';
+            plotCtx.fillRect(0, 0, width, height);
+
+            // Find min/max for scaling
+            let minEntropy = Math.min(...entropyHistory.map(h => h.entropy));
+            let maxEntropy = Math.max(...entropyHistory.map(h => h.entropy));
+            const minEpoch = entropyHistory[0].epoch;
+            const maxEpoch = entropyHistory[entropyHistory.length - 1].epoch;
+
+            // Add some padding to entropy range
+            const entropyRange = maxEntropy - minEntropy;
+            if (entropyRange < 0.1) {
+                minEntropy -= 0.05;
+                maxEntropy += 0.05;
+            }
+
+            // Draw axes
+            plotCtx.strokeStyle = '#00ff00';
+            plotCtx.lineWidth = 1;
+            plotCtx.beginPath();
+            plotCtx.moveTo(padding, padding);
+            plotCtx.lineTo(padding, height - padding);
+            plotCtx.lineTo(width - padding, height - padding);
+            plotCtx.stroke();
+
+            // Draw grid lines
+            plotCtx.strokeStyle = '#003300';
+            plotCtx.lineWidth = 0.5;
+            for (let i = 0; i <= 10; i++) {
+                const y = padding + (height - 2 * padding) * i / 10;
+                plotCtx.beginPath();
+                plotCtx.moveTo(padding, y);
+                plotCtx.lineTo(width - padding, y);
+                plotCtx.stroke();
+            }
+
+            // Draw entropy line
+            plotCtx.strokeStyle = '#00ff00';
+            plotCtx.lineWidth = 2;
+            plotCtx.beginPath();
+
+            for (let i = 0; i < entropyHistory.length; i++) {
+                const h = entropyHistory[i];
+                const x = padding + (width - 2 * padding) * i / (entropyHistory.length - 1 || 1);
+                const y = height - padding - (height - 2 * padding) * (h.entropy - minEntropy) / (maxEntropy - minEntropy || 1);
+
+                if (i === 0) {
+                    plotCtx.moveTo(x, y);
+                } else {
+                    plotCtx.lineTo(x, y);
+                }
+            }
+            plotCtx.stroke();
+
+            // Draw labels
+            plotCtx.fillStyle = '#00ff00';
+            plotCtx.font = '10px Courier New';
+            plotCtx.textAlign = 'right';
+
+            // Y-axis labels
+            plotCtx.fillText(maxEntropy.toFixed(3), padding - 5, padding + 5);
+            plotCtx.fillText(minEntropy.toFixed(3), padding - 5, height - padding + 5);
+
+            // X-axis labels
+            plotCtx.textAlign = 'center';
+            plotCtx.fillText(`Epoch ${minEpoch}`, padding, height - padding + 15);
+            plotCtx.fillText(`Epoch ${maxEpoch}`, width - padding, height - padding + 15);
+
+            // Title
+            plotCtx.textAlign = 'center';
+            plotCtx.font = '12px Courier New';
+            plotCtx.fillText('Higher Order Entropy', width / 2, padding - 15);
+        }
+
         // Handle window resize
         window.addEventListener('resize', () => {
             if (gridWidth > 0 && gridHeight > 0) {
-                const containerWidth = canvas.parentElement.clientWidth - 20;
-                const containerHeight = canvas.parentElement.clientHeight - 20;
+                const containerWidth = gridCanvas.parentElement.clientWidth - 20;
+                const containerHeight = gridCanvas.parentElement.clientHeight - 20;
                 const scaleX = Math.floor(containerWidth / gridWidth);
                 const scaleY = Math.floor(containerHeight / gridHeight);
                 scale = Math.max(1, Math.min(scaleX, scaleY));
 
-                canvas.width = gridWidth * scale;
-                canvas.height = gridHeight * scale;
+                gridCanvas.width = gridWidth * scale;
+                gridCanvas.height = gridHeight * scale;
+
+                drawEntropyPlot();
             }
         });
 
