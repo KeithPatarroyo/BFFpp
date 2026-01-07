@@ -1,0 +1,23 @@
+# Darwin Experiment Test Configuration
+# Small grids for quick testing
+
+# Grid dimensions
+grid_width: 10           # Width of each half (total width will be 2*10=20)
+grid_height: 10          # Height of grid
+program_size: 32         # Size of each program in bytes
+
+# Phase 1: Independent evolution (epochs 0 to barrier_removal_epoch)
+left_config: configs/darwin_left.yaml
+right_config: configs/darwin_right.yaml
+barrier_removal_epoch: 20    # t1: When barrier is removed
+
+# Phase 2: Merged evolution (epochs barrier_removal_epoch to final_epoch)
+merged_config: configs/darwin_merged.yaml
+final_epoch: 50          # t2: End of experiment
+
+# Evaluation and visualization
+eval_interval: 5
+visualization_interval: 10
+
+# Random seed for reproducibility
+random_seed: 42

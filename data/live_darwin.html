@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Darwin Experiment - BFF Evolution</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #00ff00;
+            background: #001100;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            text-shadow: 0 0 10px #00ff00;
+            margin-bottom: 10px;
+        }
+
+        .header .status {
+            font-size: 14px;
+            color: #00cc00;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            padding: 20px;
+            gap: 20px;
+            overflow: hidden;
+        }
+
+        .grid-container {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .grid-wrapper {
+            flex: 1;
+            position: relative;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        .barrier {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(to bottom,
+                #ff0000 0%,
+                #ff6600 25%,
+                #ffff00 50%,
+                #ff6600 75%,
+                #ff0000 100%);
+            transform: translateX(-50%);
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+            z-index: 10;
+            opacity: 1;
+            transition: opacity 1s ease-out, width 1s ease-out;
+        }
+
+        .barrier.removing {
+            animation: barrierPulse 0.5s ease-in-out 3;
+        }
+
+        .barrier.removed {
+            opacity: 0;
+            width: 0;
+        }
+
+        @keyframes barrierPulse {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+                width: 4px;
+            }
+            50% {
+                box-shadow: 0 0 40px rgba(255, 0, 0, 1);
+                width: 8px;
+            }
+        }
+
+        .stats-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .stats-box {
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            padding: 15px;
+            background: #001100;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+
+        .stats-box h3 {
+            color: #00ff00;
+            margin-bottom: 10px;
+            font-size: 16px;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            font-size: 12px;
+            color: #00cc00;
+        }
+
+        .stat-label {
+            color: #00ff00;
+        }
+
+        .plot-canvas {
+            width: 100%;
+            height: 200px;
+            border: 1px solid #00ff00;
+            border-radius: 3px;
+            margin-top: 10px;
+        }
+
+        .phase-indicator {
+            padding: 10px;
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            background: #001100;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .phase-1 {
+            color: #ff6600;
+            border-color: #ff6600;
+            box-shadow: 0 0 20px rgba(255, 102, 0, 0.5);
+        }
+
+        .phase-2 {
+            color: #00ff00;
+            border-color: #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border: 1px solid #00ff00;
+            border-radius: 3px;
+            background: #001100;
+            font-size: 12px;
+        }
+
+        .connected {
+            color: #00ff00;
+        }
+
+        .disconnected {
+            color: #ff0000;
+            border-color: #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connection-status">● Connecting...</div>
+
+    <div class="header">
+        <h1>⚗️ THE DARWIN EXPERIMENT ⚗️</h1>
+        <div class="status" id="header-status">Initializing...</div>
+    </div>
+
+    <div class="main-content">
+        <div class="grid-container">
+            <div class="phase-indicator phase-1" id="phase-indicator">
+                PHASE 1: ISOLATED EVOLUTION
+            </div>
+            <div class="grid-wrapper" id="grid-wrapper">
+                <canvas id="grid-canvas"></canvas>
+                <div class="barrier" id="barrier"></div>
+            </div>
+        </div>
+
+        <div class="stats-panel">
+            <div class="stats-box">
+                <h3>📊 EPOCH STATS</h3>
+                <div class="stat-row">
+                    <span class="stat-label">Current Epoch:</span>
+                    <span id="stat-epoch">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Barrier Removal:</span>
+                    <span id="stat-barrier-epoch">-</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Phase:</span>
+                    <span id="stat-phase">1 (Isolated)</span>
+                </div>
+            </div>
+
+            <div class="stats-box" id="left-stats">
+                <h3>📈 LEFT POPULATION</h3>
+                <div class="stat-row">
+                    <span class="stat-label">Entropy:</span>
+                    <span id="left-entropy">0.000</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Avg Iterations:</span>
+                    <span id="left-iters">0.0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Finished Ratio:</span>
+                    <span id="left-finished">0.000</span>
+                </div>
+                <canvas id="left-plot" class="plot-canvas"></canvas>
+            </div>
+
+            <div class="stats-box" id="right-stats">
+                <h3>📈 RIGHT POPULATION</h3>
+                <div class="stat-row">
+                    <span class="stat-label">Entropy:</span>
+                    <span id="right-entropy">0.000</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Avg Iterations:</span>
+                    <span id="right-iters">0.0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Finished Ratio:</span>
+                    <span id="right-finished">0.000</span>
+                </div>
+                <canvas id="right-plot" class="plot-canvas"></canvas>
+            </div>
+
+            <div class="stats-box" id="merged-stats" style="display: none;">
+                <h3>📈 MERGED POPULATION</h3>
+                <div class="stat-row">
+                    <span class="stat-label">Entropy:</span>
+                    <span id="merged-entropy">0.000</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Avg Iterations:</span>
+                    <span id="merged-iters">0.0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Finished Ratio:</span>
+                    <span id="merged-finished">0.000</span>
+                </div>
+                <canvas id="merged-plot" class="plot-canvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('grid-canvas');
+        const ctx = canvas.getContext('2d');
+        const barrier = document.getElementById('barrier');
+        const phaseIndicator = document.getElementById('phase-indicator');
+        const headerStatus = document.getElementById('header-status');
+        const connectionStatus = document.getElementById('connection-status');
+
+        let currentPhase = 1;
+        let barrierRemovalEpoch = 0;
+        let ws = null;
+        let reconnectInterval = null;
+
+        // Entropy history for plots
+        const leftEntropyHistory = [];
+        const rightEntropyHistory = [];
+        const mergedEntropyHistory = [];
+        const maxHistoryLength = 500;
+
+        function connectWebSocket() {
+            ws = new WebSocket('ws://localhost:8080');
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                connectionStatus.textContent = '● Connected';
+                connectionStatus.className = 'connection-status connected';
+                if (reconnectInterval) {
+                    clearInterval(reconnectInterval);
+                    reconnectInterval = null;
+                }
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    updateVisualization(data);
+                } catch (e) {
+                    console.error('Error parsing WebSocket message:', e);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                connectionStatus.textContent = '● Disconnected';
+                connectionStatus.className = 'connection-status disconnected';
+
+                if (!reconnectInterval) {
+                    reconnectInterval = setInterval(() => {
+                        console.log('Attempting to reconnect...');
+                        connectWebSocket();
+                    }, 2000);
+                }
+            };
+        }
+
+        function updateVisualization(data) {
+            const epoch = data.epoch;
+            const phase = data.phase;
+            barrierRemovalEpoch = data.barrier_removal_epoch;
+
+            // Update epoch stats
+            document.getElementById('stat-epoch').textContent = epoch;
+            document.getElementById('stat-barrier-epoch').textContent = barrierRemovalEpoch;
+            document.getElementById('stat-phase').textContent =
+                phase === 1 ? '1 (Isolated)' : '2 (Merged)';
+
+            headerStatus.textContent = phase === 1
+                ? `Two populations evolving independently (${epoch}/${barrierRemovalEpoch})`
+                : `Populations mixing after barrier removal (${epoch})`;
+
+            if (phase === 1) {
+                // Phase 1: Show two grids side by side with barrier
+                if (currentPhase !== 1) {
+                    currentPhase = 1;
+                    phaseIndicator.textContent = 'PHASE 1: ISOLATED EVOLUTION';
+                    phaseIndicator.className = 'phase-indicator phase-1';
+                    document.getElementById('left-stats').style.display = 'block';
+                    document.getElementById('right-stats').style.display = 'block';
+                    document.getElementById('merged-stats').style.display = 'none';
+                }
+
+                drawTwoGrids(data.left.grid, data.right.grid, data.grid_width, data.grid_height);
+
+                // Update stats
+                document.getElementById('left-entropy').textContent = data.left.entropy.toFixed(6);
+                document.getElementById('left-iters').textContent = data.left.avg_iters.toFixed(1);
+                document.getElementById('left-finished').textContent = data.left.finished_ratio.toFixed(3);
+
+                document.getElementById('right-entropy').textContent = data.right.entropy.toFixed(6);
+                document.getElementById('right-iters').textContent = data.right.avg_iters.toFixed(1);
+                document.getElementById('right-finished').textContent = data.right.finished_ratio.toFixed(3);
+
+                // Track entropy
+                leftEntropyHistory.push(data.left.entropy);
+                rightEntropyHistory.push(data.right.entropy);
+                if (leftEntropyHistory.length > maxHistoryLength) leftEntropyHistory.shift();
+                if (rightEntropyHistory.length > maxHistoryLength) rightEntropyHistory.shift();
+
+                drawEntropyPlot('left-plot', leftEntropyHistory, '#00ff00');
+                drawEntropyPlot('right-plot', rightEntropyHistory, '#00ccff');
+
+                // Check if barrier should be removed
+                if (epoch === barrierRemovalEpoch - 1) {
+                    // Start barrier removal animation
+                    barrier.classList.add('removing');
+                    setTimeout(() => {
+                        barrier.classList.add('removed');
+                    }, 1500);
+                }
+            } else {
+                // Phase 2: Show merged grid
+                if (currentPhase !== 2) {
+                    currentPhase = 2;
+                    phaseIndicator.textContent = 'PHASE 2: POPULATIONS MIXING';
+                    phaseIndicator.className = 'phase-indicator phase-2';
+                    document.getElementById('left-stats').style.display = 'none';
+                    document.getElementById('right-stats').style.display = 'none';
+                    document.getElementById('merged-stats').style.display = 'block';
+                    barrier.style.display = 'none';
+                }
+
+                drawSingleGrid(data.merged.grid, data.merged.width, data.merged.height);
+
+                // Update merged stats
+                document.getElementById('merged-entropy').textContent = data.merged.entropy.toFixed(6);
+                document.getElementById('merged-iters').textContent = data.merged.avg_iters.toFixed(1);
+                document.getElementById('merged-finished').textContent = data.merged.finished_ratio.toFixed(3);
+
+                // Track entropy
+                mergedEntropyHistory.push(data.merged.entropy);
+                if (mergedEntropyHistory.length > maxHistoryLength) mergedEntropyHistory.shift();
+
+                drawEntropyPlot('merged-plot', mergedEntropyHistory, '#00ff00');
+            }
+        }
+
+        function drawTwoGrids(leftGrid, rightGrid, width, height) {
+            const cellSize = Math.floor(Math.min(
+                (canvas.parentElement.clientWidth - 40) / (2 * width),
+                (canvas.parentElement.clientHeight - 40) / height
+            ));
+
+            canvas.width = 2 * width * cellSize;
+            canvas.height = height * cellSize;
+
+            // Draw left grid
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const [r, g, b] = leftGrid[y][x];
+                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+
+            // Draw right grid
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const [r, g, b] = rightGrid[y][x];
+                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                    ctx.fillRect((x + width) * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        function drawSingleGrid(grid, width, height) {
+            const cellSize = Math.floor(Math.min(
+                (canvas.parentElement.clientWidth - 40) / width,
+                (canvas.parentElement.clientHeight - 40) / height
+            ));
+
+            canvas.width = width * cellSize;
+            canvas.height = height * cellSize;
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const [r, g, b] = grid[y][x];
+                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        function drawEntropyPlot(canvasId, history, color) {
+            const plotCanvas = document.getElementById(canvasId);
+            if (!plotCanvas) return;
+
+            const plotCtx = plotCanvas.getContext('2d');
+            const width = plotCanvas.width = plotCanvas.clientWidth;
+            const height = plotCanvas.height = plotCanvas.clientHeight;
+
+            plotCtx.fillStyle = '#000';
+            plotCtx.fillRect(0, 0, width, height);
+
+            if (history.length < 2) return;
+
+            const minEntropy = Math.min(...history);
+            const maxEntropy = Math.max(...history);
+            const range = maxEntropy - minEntropy || 1;
+
+            const padding = 30;
+            const plotWidth = width - 2 * padding;
+            const plotHeight = height - 2 * padding;
+
+            // Draw grid lines
+            plotCtx.strokeStyle = '#003300';
+            plotCtx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding + (plotHeight * i) / 5;
+                plotCtx.beginPath();
+                plotCtx.moveTo(padding, y);
+                plotCtx.lineTo(width - padding, y);
+                plotCtx.stroke();
+            }
+
+            // Draw entropy line
+            plotCtx.strokeStyle = color;
+            plotCtx.lineWidth = 2;
+            plotCtx.beginPath();
+
+            for (let i = 0; i < history.length; i++) {
+                const x = padding + (plotWidth * i) / (history.length - 1);
+                const normalized = (history[i] - minEntropy) / range;
+                const y = height - padding - (plotHeight * normalized);
+
+                if (i === 0) {
+                    plotCtx.moveTo(x, y);
+                } else {
+                    plotCtx.lineTo(x, y);
+                }
+            }
+            plotCtx.stroke();
+
+            // Draw axes labels
+            plotCtx.fillStyle = color;
+            plotCtx.font = '10px monospace';
+            plotCtx.fillText(maxEntropy.toFixed(3), 5, padding);
+            plotCtx.fillText(minEntropy.toFixed(3), 5, height - padding);
+        }
+
+        // Initial connection
+        connectWebSocket();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            // Redraw on resize if we have data
+        });
+    </script>
+</body>
+</html>
