@@ -67,3 +67,22 @@ target_compile_options(bffpp_grid PRIVATE ${BROTLI_CFLAGS_OTHER})
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(bffpp_grid PRIVATE -Wall -Wextra -O3)
 endif()
+
+# Darwin Experiment executable
+add_executable(bffpp_darwin
+    src/main_darwin.cpp
+    src/emulator.cpp
+    src/utils.cpp
+    src/metrics.cpp
+    src/config.cpp
+    src/grid.cpp
+    src/websocket_server.cpp
+)
+
+# Link libraries for darwin
+target_link_libraries(bffpp_darwin ${BROTLI_LIBRARIES} pthread OpenSSL::SSL OpenSSL::Crypto)
+target_include_directories(bffpp_darwin PRIVATE ${BROTLI_INCLUDE_DIRS})
+target_compile_options(bffpp_darwin PRIVATE ${BROTLI_CFLAGS_OTHER})
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(bffpp_darwin PRIVATE -Wall -Wextra -O3)
+endif()

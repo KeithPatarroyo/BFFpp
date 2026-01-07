@@ -1,0 +1,23 @@
+# Darwin Experiment Configuration
+# Two populations evolve independently, then merge
+
+# Grid dimensions
+grid_width: 60           # Width of each half (total width will be 2*60=120)
+grid_height: 45          # Height of grid
+program_size: 32         # Size of each program in bytes
+
+# Phase 1: Independent evolution (epochs 0 to barrier_removal_epoch)
+left_config: configs/darwin_left.yaml
+right_config: configs/darwin_right.yaml
+barrier_removal_epoch: 500    # t1: When barrier is removed
+
+# Phase 2: Merged evolution (epochs barrier_removal_epoch to final_epoch)
+merged_config: configs/darwin_merged.yaml
+final_epoch: 1000        # t2: End of experiment
+
+# Evaluation and visualization
+eval_interval: 10
+visualization_interval: 100
+
+# Random seed for reproducibility
+random_seed: 42

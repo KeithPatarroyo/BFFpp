@@ -1,0 +1,14 @@
+# Right population configuration
+# Lower mutation rate for more stability
+
+program_size: 32
+mutation_rate: 0.0003     # Lower mutation
+max_iterations: 8192
+eval_interval: 10
+visualization_interval: 100
+random_seed: 42
+
+# Grid settings (overridden by Darwin config)
+grid_width: 60
+grid_height: 45
+epochs: 500
