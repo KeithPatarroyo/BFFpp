@@ -18,6 +18,7 @@ bffpp
 data/*.txt
 data/*.csv
 data/*.png
+data/visualizations/
 
 # Keep directory structure
 !data/.gitkeep
