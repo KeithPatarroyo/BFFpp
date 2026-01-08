@@ -193,6 +193,43 @@
             color: #ff0000;
             border-color: #ff0000;
         }
+
+        .controls {
+            padding: 10px 20px;
+            background: #001100;
+            border-bottom: 2px solid #00ff00;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .control-button {
+            padding: 8px 20px;
+            border: 2px solid #00ff00;
+            border-radius: 5px;
+            background: #001100;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+        }
+
+        .control-button:hover {
+            background: #003300;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+            transform: translateY(-2px);
+        }
+
+        .control-button:active {
+            transform: translateY(0);
+        }
+
+        .control-button.active {
+            background: #004400;
+            box-shadow: 0 0 25px rgba(0, 255, 0, 0.8);
+        }
     </style>
 </head>
 <body>
@@ -201,6 +238,11 @@
     <div class="header">
         <h1>⚗️ THE DARWIN EXPERIMENT ⚗️</h1>
         <div class="status" id="header-status">Initializing...</div>
+    </div>
+
+    <div class="controls">
+        <button class="control-button active" id="play-button" onclick="sendPlayCommand()">▶ PLAY</button>
+        <button class="control-button" id="pause-button" onclick="sendPauseCommand()">⏸ PAUSE</button>
     </div>
 
     <div class="main-content">
@@ -302,6 +344,24 @@
         const rightEntropyHistory = [];
         const mergedEntropyHistory = [];
         const maxHistoryLength = 500;
+
+        function sendPlayCommand() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send('play');
+                document.getElementById('play-button').classList.add('active');
+                document.getElementById('pause-button').classList.remove('active');
+                console.log('Sent play command');
+            }
+        }
+
+        function sendPauseCommand() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send('pause');
+                document.getElementById('pause-button').classList.add('active');
+                document.getElementById('play-button').classList.remove('active');
+                console.log('Sent pause command');
+            }
+        }
 
         function connectWebSocket() {
             ws = new WebSocket('ws://localhost:8080');

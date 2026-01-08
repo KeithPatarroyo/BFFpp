@@ -44,7 +44,7 @@ static std::string base64_encode(const unsigned char* input, int length) {
 }
 
 WebSocketServer::WebSocketServer(int port)
-    : port(port), server_socket(-1), running(false) {
+    : port(port), server_socket(-1), running(false), paused(false) {
 }
 
 WebSocketServer::~WebSocketServer() {
@@ -201,7 +201,49 @@ void WebSocketServer::handle_client(int client_socket) {
                 std::cout << "WebSocket client connected (" << client_sockets.size() << " total)" << std::endl;
             }
 
-            // Keep connection alive (will be closed when client disconnects or server stops)
+            // Keep reading messages from client
+            while (running) {
+                std::vector<uint8_t> frame_buffer(4096);
+                ssize_t bytes = recv(client_socket, frame_buffer.data(), frame_buffer.size(), 0);
+
+                if (bytes <= 0) {
+                    // Client disconnected
+                    break;
+                }
+
+                frame_buffer.resize(bytes);
+                std::string message = parse_websocket_frame(frame_buffer);
+
+                if (!message.empty()) {
+                    // Handle command
+                    if (message == "pause") {
+                        paused = true;
+                        std::cout << "Simulation paused by client" << std::endl;
+                    } else if (message == "play") {
+                        paused = false;
+                        std::cout << "Simulation resumed by client" << std::endl;
+                    }
+
+                    // Invoke callback if set
+                    {
+                        std::lock_guard<std::mutex> lock(callback_mutex);
+                        if (command_callback) {
+                            command_callback(message);
+                        }
+                    }
+                }
+            }
+
+            // Remove client from list
+            {
+                std::lock_guard<std::mutex> lock(clients_mutex);
+                auto it = std::find(client_sockets.begin(), client_sockets.end(), client_socket);
+                if (it != client_sockets.end()) {
+                    client_sockets.erase(it);
+                    std::cout << "WebSocket client disconnected (" << client_sockets.size() << " remaining)" << std::endl;
+                }
+            }
+            close(client_socket);
             return;
         }
     }
@@ -257,4 +299,58 @@ std::vector<uint8_t> WebSocketServer::create_websocket_frame(const std::string& 
     frame.insert(frame.end(), message.begin(), message.end());
 
     return frame;
+}
+
+void WebSocketServer::set_command_callback(std::function<void(const std::string&)> callback) {
+    std::lock_guard<std::mutex> lock(callback_mutex);
+    command_callback = callback;
+}
+
+bool WebSocketServer::is_paused() const {
+    return paused;
+}
+
+std::string WebSocketServer::parse_websocket_frame(const std::vector<uint8_t>& frame) {
+    if (frame.size() < 2) return "";
+
+    // Check if message is masked (from client)
+    bool masked = (frame[1] & 0x80) != 0;
+    uint64_t payload_len = frame[1] & 0x7F;
+    size_t pos = 2;
+
+    // Extended payload length
+    if (payload_len == 126) {
+        if (frame.size() < 4) return "";
+        payload_len = (frame[2] << 8) | frame[3];
+        pos = 4;
+    } else if (payload_len == 127) {
+        if (frame.size() < 10) return "";
+        payload_len = 0;
+        for (int i = 0; i < 8; i++) {
+            payload_len = (payload_len << 8) | frame[2 + i];
+        }
+        pos = 10;
+    }
+
+    // Masking key (if masked)
+    uint8_t mask[4] = {0};
+    if (masked) {
+        if (frame.size() < pos + 4) return "";
+        for (int i = 0; i < 4; i++) {
+            mask[i] = frame[pos + i];
+        }
+        pos += 4;
+    }
+
+    // Decode payload
+    std::string message;
+    for (size_t i = 0; i < payload_len && (pos + i) < frame.size(); i++) {
+        if (masked) {
+            message += static_cast<char>(frame[pos + i] ^ mask[i % 4]);
+        } else {
+            message += static_cast<char>(frame[pos + i]);
+        }
+    }
+
+    return message;
 }

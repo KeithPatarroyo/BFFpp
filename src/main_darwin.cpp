@@ -239,6 +239,11 @@ int main(int argc, char* argv[]) {
     std::cout << "--- PHASE 1: BARRIER IN PLACE ---" << std::endl;
 
     for (int epoch = 0; epoch < darwin_config.barrier_removal_epoch; epoch++) {
+        // Check if paused
+        while (ws_server.is_paused()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
         std::vector<EmulatorResult> left_results, right_results;
         double left_iters, left_skips, left_finished, left_terminated;
         double right_iters, right_skips, right_finished, right_terminated;
@@ -329,6 +334,11 @@ int main(int argc, char* argv[]) {
     std::cout << "--- PHASE 2: POPULATIONS MIXING ---" << std::endl;
 
     for (int epoch = darwin_config.barrier_removal_epoch; epoch < darwin_config.final_epoch; epoch++) {
+        // Check if paused
+        while (ws_server.is_paused()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
         std::vector<EmulatorResult> results;
         double total_iters, total_skips, finished, terminated;
 
