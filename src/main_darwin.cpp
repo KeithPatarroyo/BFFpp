@@ -238,6 +238,10 @@ int main(int argc, char* argv[]) {
     // PHASE 1: Independent evolution (0 to t1)
     std::cout << "--- PHASE 1: BARRIER IN PLACE ---" << std::endl;
 
+    // Track entropy history
+    std::vector<int> left_epochs, right_epochs, merged_epochs;
+    std::vector<double> left_entropy_history, right_entropy_history, merged_entropy_history;
+
     for (int epoch = 0; epoch < darwin_config.barrier_removal_epoch; epoch++) {
         // Check if paused
         while (ws_server.is_paused()) {
@@ -267,6 +271,12 @@ int main(int argc, char* argv[]) {
 
         double left_hoe = higher_order_entropy(left_flat);
         double right_hoe = higher_order_entropy(right_flat);
+
+        // Track entropy history for Phase 1
+        left_epochs.push_back(epoch);
+        left_entropy_history.push_back(left_hoe);
+        right_epochs.push_back(epoch);
+        right_entropy_history.push_back(right_hoe);
 
         // Broadcast to WebSocket (send both grids with barrier flag)
         if (ws_server.has_clients()) {
@@ -352,6 +362,10 @@ int main(int argc, char* argv[]) {
         }
         double hoe = higher_order_entropy(flat_soup);
 
+        // Track entropy history for Phase 2
+        merged_epochs.push_back(epoch);
+        merged_entropy_history.push_back(hoe);
+
         // Broadcast merged grid
         if (ws_server.has_clients()) {
             std::ostringstream json;
@@ -374,6 +388,44 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "\n=== DARWIN EXPERIMENT COMPLETE ===" << std::endl;
+
+    // Save entropy histories to CSV files
+    std::cout << "\nSaving entropy histories..." << std::endl;
+
+    // Save left grid entropy
+    std::ofstream left_file("data/visualizations/darwin/left_entropy.csv");
+    if (left_file.is_open()) {
+        left_file << "epoch,entropy\n";
+        for (size_t i = 0; i < left_epochs.size(); i++) {
+            left_file << left_epochs[i] << "," << std::fixed << std::setprecision(8) << left_entropy_history[i] << "\n";
+        }
+        left_file.close();
+        std::cout << "  Saved left_entropy.csv (" << left_epochs.size() << " epochs)" << std::endl;
+    }
+
+    // Save right grid entropy
+    std::ofstream right_file("data/visualizations/darwin/right_entropy.csv");
+    if (right_file.is_open()) {
+        right_file << "epoch,entropy\n";
+        for (size_t i = 0; i < right_epochs.size(); i++) {
+            right_file << right_epochs[i] << "," << std::fixed << std::setprecision(8) << right_entropy_history[i] << "\n";
+        }
+        right_file.close();
+        std::cout << "  Saved right_entropy.csv (" << right_epochs.size() << " epochs)" << std::endl;
+    }
+
+    // Save merged grid entropy
+    std::ofstream merged_file("data/visualizations/darwin/merged_entropy.csv");
+    if (merged_file.is_open()) {
+        merged_file << "epoch,entropy\n";
+        for (size_t i = 0; i < merged_epochs.size(); i++) {
+            merged_file << merged_epochs[i] << "," << std::fixed << std::setprecision(8) << merged_entropy_history[i] << "\n";
+        }
+        merged_file.close();
+        std::cout << "  Saved merged_entropy.csv (" << merged_epochs.size() << " epochs)" << std::endl;
+    }
+
+    std::cout << "\nEntropy tracking complete!" << std::endl;
 
     return 0;
 }
