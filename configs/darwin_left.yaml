@@ -6,7 +6,7 @@ mutation_rate: 0.001      # Higher mutation
 max_iterations: 8192
 eval_interval: 10
 visualization_interval: 100
-random_seed: 42
+random_seed: 42           # Left population seed
 
 # Grid settings (overridden by Darwin config)
 grid_width: 60
