@@ -32,6 +32,14 @@ std::vector<uint8_t> mutate(
     double mutation_rate = 0.0
 );
 
+std::vector<uint8_t> mutate(
+    std::vector<uint8_t> tape,
+    double mutation_rate,
+    std::mt19937& rng
+);
+
 std::vector<uint8_t> generate_random_program(int length);
+
+std::vector<uint8_t> generate_random_program(int length, std::mt19937& rng);
 
 #endif // UTILS_H

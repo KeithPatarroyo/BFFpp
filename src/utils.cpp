@@ -104,3 +104,34 @@ std::vector<uint8_t> generate_random_program(int length) {
     }
     return program;
 }
+
+std::vector<uint8_t> generate_random_program(int length, std::mt19937& custom_rng) {
+    std::uniform_int_distribution<> dis(0, 255);
+
+    std::vector<uint8_t> program(length);
+    for (int i = 0; i < length; i++) {
+        program[i] = static_cast<uint8_t>(dis(custom_rng));
+    }
+    return program;
+}
+
+std::vector<uint8_t> mutate(
+    std::vector<uint8_t> tape,
+    double mutation_rate,
+    std::mt19937& custom_rng
+) {
+    if (mutation_rate == 0.0) {
+        return tape;
+    }
+
+    std::uniform_real_distribution<> dis(0.0, 1.0);
+    std::uniform_int_distribution<> byte_dis(0, 255);
+
+    for (size_t i = 0; i < tape.size(); i++) {
+        if (dis(custom_rng) < mutation_rate) {
+            tape[i] = static_cast<uint8_t>(byte_dis(custom_rng));
+        }
+    }
+
+    return tape;
+}
