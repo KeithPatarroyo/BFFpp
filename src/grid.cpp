@@ -21,6 +21,12 @@ void Grid::initialize_random() {
     }
 }
 
+void Grid::initialize_random(std::mt19937& rng) {
+    for (auto& program : grid_data) {
+        program = generate_random_program(program_size, rng);
+    }
+}
+
 std::vector<uint8_t>& Grid::get_program(int x, int y) {
     return grid_data[index(x, y)];
 }
@@ -318,6 +324,62 @@ std::vector<std::pair<int, int>> Grid::create_spatial_pairs(int neighborhood_rad
         if (!available_neighbors.empty()) {
             std::uniform_int_distribution<int> dist(0, available_neighbors.size() - 1);
             int chosen_idx = available_neighbors[dist(rng)];
+
+            // Mark both as taken and add pair
+            taken[cell_idx] = true;
+            taken[chosen_idx] = true;
+            pairs.push_back({cell_idx, chosen_idx});
+        } else {
+            // No available neighbors - mark as mutation-only
+            taken[cell_idx] = true;
+            pairs.push_back({-1, cell_idx});
+        }
+    }
+
+    return pairs;
+}
+
+std::vector<std::pair<int, int>> Grid::create_spatial_pairs(int neighborhood_radius, std::mt19937& custom_rng) {
+    int total_cells = width * height;
+    std::vector<std::pair<int, int>> pairs;
+    std::vector<bool> taken(total_cells, false);
+
+    // Create a random order to visit cells
+    std::vector<int> cell_order(total_cells);
+    for (int i = 0; i < total_cells; i++) {
+        cell_order[i] = i;
+    }
+
+    // Use custom RNG instead of shared RNG
+    std::shuffle(cell_order.begin(), cell_order.end(), custom_rng);
+
+    // Process cells in random order
+    for (int cell_idx : cell_order) {
+        // Skip if already taken
+        if (taken[cell_idx]) {
+            continue;
+        }
+
+        // Convert flat index to x, y
+        int y = cell_idx / width;
+        int x = cell_idx % width;
+
+        // Get neighbors
+        std::vector<Cell> neighbors = get_von_neumann_neighbors(x, y, neighborhood_radius);
+
+        // Filter to only untaken neighbors
+        std::vector<int> available_neighbors;
+        for (const Cell& neighbor : neighbors) {
+            int neighbor_idx = index(neighbor.x, neighbor.y);
+            if (!taken[neighbor_idx]) {
+                available_neighbors.push_back(neighbor_idx);
+            }
+        }
+
+        // If there are available neighbors, pick one randomly
+        if (!available_neighbors.empty()) {
+            std::uniform_int_distribution<int> dist(0, available_neighbors.size() - 1);
+            int chosen_idx = available_neighbors[dist(custom_rng)];
 
             // Mark both as taken and add pair
             taken[cell_idx] = true;

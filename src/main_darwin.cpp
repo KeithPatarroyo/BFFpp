@@ -97,10 +97,11 @@ void evolve_grid_epoch(
     double& total_iterations,
     double& total_skipped,
     double& finished_runs,
-    double& terminated_runs
+    double& terminated_runs,
+    std::mt19937& rng
 ) {
     std::vector<std::vector<uint8_t>> soup = grid.get_all_programs();
-    std::vector<std::pair<int, int>> program_pairs = grid.create_spatial_pairs(2);
+    std::vector<std::pair<int, int>> program_pairs = grid.create_spatial_pairs(2, rng);
 
     results.resize(program_pairs.size());
     std::vector<std::thread> threads;
@@ -145,7 +146,7 @@ void evolve_grid_epoch(
         int idx_b = program_pairs[i].second;
 
         if (idx_a == -1) {
-            soup[idx_b] = mutate(soup[idx_b], config.mutation_rate);
+            soup[idx_b] = mutate(soup[idx_b], config.mutation_rate, rng);
             continue;
         }
 
@@ -160,8 +161,8 @@ void evolve_grid_epoch(
             result.tape.end()
         );
 
-        soup[idx_a] = mutate(programA_new, config.mutation_rate);
-        soup[idx_b] = mutate(programB_new, config.mutation_rate);
+        soup[idx_a] = mutate(programA_new, config.mutation_rate, rng);
+        soup[idx_b] = mutate(programB_new, config.mutation_rate, rng);
 
         total_iterations += result.iteration;
         total_skipped += result.skipped;
@@ -200,15 +201,17 @@ int main(int argc, char* argv[]) {
     Config right_config = load_config(darwin_config.right_config);
     Config merged_config = load_config(darwin_config.merged_config);
 
-    // Set random seed
-    seed_random(darwin_config.random_seed);
+    // Create separate RNGs for left and right populations (truly independent evolution)
+    std::mt19937 left_rng(darwin_config.random_seed);
+    std::mt19937 right_rng(darwin_config.random_seed + 1000);  // Different seed for right
+    std::mt19937 merged_rng(darwin_config.random_seed);  // Use base seed for merged
 
     // Create two separate grids for Phase 1
     Grid left_grid(darwin_config.grid_width, darwin_config.grid_height, darwin_config.program_size);
     Grid right_grid(darwin_config.grid_width, darwin_config.grid_height, darwin_config.program_size);
 
-    left_grid.initialize_random();
-    right_grid.initialize_random();
+    left_grid.initialize_random(left_rng);
+    right_grid.initialize_random(right_rng);
 
     std::cout << "=== DARWIN EXPERIMENT ===" << std::endl;
     std::cout << "Phase 1: Independent evolution (epochs 0-" << darwin_config.barrier_removal_epoch << ")" << std::endl;
@@ -242,11 +245,11 @@ int main(int argc, char* argv[]) {
 
         // Evolve left grid
         evolve_grid_epoch(left_grid, left_config, left_results,
-                         left_iters, left_skips, left_finished, left_terminated);
+                         left_iters, left_skips, left_finished, left_terminated, left_rng);
 
         // Evolve right grid
         evolve_grid_epoch(right_grid, right_config, right_results,
-                         right_iters, right_skips, right_finished, right_terminated);
+                         right_iters, right_skips, right_finished, right_terminated, right_rng);
 
         // Calculate combined stats
         std::vector<uint8_t> left_flat, right_flat;
@@ -330,7 +333,7 @@ int main(int argc, char* argv[]) {
         double total_iters, total_skips, finished, terminated;
 
         evolve_grid_epoch(merged_grid, merged_config, results,
-                         total_iters, total_skips, finished, terminated);
+                         total_iters, total_skips, finished, terminated, merged_rng);
 
         // Calculate stats
         std::vector<uint8_t> flat_soup;

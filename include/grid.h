@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdint>
 #include <string>
+#include <random>
 
 struct RGB {
     uint8_t r;
@@ -17,6 +18,7 @@ public:
 
     // Initialize grid with random programs
     void initialize_random();
+    void initialize_random(std::mt19937& rng);
 
     // Get program at position
     std::vector<uint8_t>& get_program(int x, int y);
@@ -57,6 +59,7 @@ public:
     // Returns vector of pairs: (cell_index1, cell_index2)
     // Cells without available neighbors return (-1, cell_index) to indicate mutation-only
     std::vector<std::pair<int, int>> create_spatial_pairs(int neighborhood_radius = 2);
+    std::vector<std::pair<int, int>> create_spatial_pairs(int neighborhood_radius, std::mt19937& rng);
 
     // Getters
     int get_width() const { return width; }
