@@ -201,10 +201,10 @@ int main(int argc, char* argv[]) {
     Config right_config = load_config(darwin_config.right_config);
     Config merged_config = load_config(darwin_config.merged_config);
 
-    // Create separate RNGs for left and right populations (truly independent evolution)
-    std::mt19937 left_rng(darwin_config.random_seed);
-    std::mt19937 right_rng(darwin_config.random_seed + 1000);  // Different seed for right
-    std::mt19937 merged_rng(darwin_config.random_seed);  // Use base seed for merged
+    // Create separate RNGs using seeds from individual config files
+    std::mt19937 left_rng(left_config.random_seed);
+    std::mt19937 right_rng(right_config.random_seed);
+    std::mt19937 merged_rng(merged_config.random_seed);
 
     // Create two separate grids for Phase 1
     Grid left_grid(darwin_config.grid_width, darwin_config.grid_height, darwin_config.program_size);

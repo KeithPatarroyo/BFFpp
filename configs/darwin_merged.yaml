@@ -6,7 +6,7 @@ mutation_rate: 0.0005     # Medium mutation
 max_iterations: 8192
 eval_interval: 10
 visualization_interval: 100
-random_seed: 42
+random_seed: 42           # Merged population seed
 
 # Grid settings (full merged grid)
 grid_width: 120
