@@ -3,6 +3,7 @@
 #include "metrics.h"
 #include "config.h"
 #include "grid_w_tracer.h"
+#include "websocket_server.h"
 
 #include <iostream>
 #include <vector>
@@ -59,12 +60,31 @@ int main(int argc, char* argv[]) {
     std::cout << "  Token snapshots will be saved to data/tokens/" << std::endl;
     std::cout << std::endl;
 
+    // Start WebSocket server for live visualization
+    WebSocketServer ws_server(8080);
+    ws_server.start();
+    std::cout << "WebSocket server started on port 8080" << std::endl;
+    std::cout << "Open data/live_grid_w_tracer.html in your browser for real-time updates" << std::endl;
+    std::cout << std::endl;
+
     // Create output directories
     system("mkdir -p data/tokens");
 
     // Save initial token snapshot
     std::cout << "Saving initial token snapshot (epoch 0)..." << std::endl;
     grid.save_tokens_to_csv("data/tokens/tokens_epoch_0000.csv", 0);
+
+    // Send initial state via WebSocket
+    std::vector<uint8_t> initial_flat;
+    for (int y = 0; y < grid.get_height(); y++) {
+        for (int x = 0; x < grid.get_width(); x++) {
+            auto bytes = grid.get_program_bytes(x, y);
+            initial_flat.insert(initial_flat.end(), bytes.begin(), bytes.end());
+        }
+    }
+    double initial_entropy = higher_order_entropy(initial_flat);
+    std::string json_data = grid.to_json(0, initial_entropy);
+    ws_server.broadcast(json_data);
 
     // Main simulation loop
     auto start_time = std::chrono::steady_clock::now();
@@ -162,6 +182,16 @@ int main(int argc, char* argv[]) {
             grid.set_program(x_b, y_b, result_b);
         }
 
+        // Calculate entropy for progress reporting
+        std::vector<uint8_t> flat_bytes;
+        for (int y = 0; y < grid.get_height(); y++) {
+            for (int x = 0; x < grid.get_width(); x++) {
+                auto bytes = grid.get_program_bytes(x, y);
+                flat_bytes.insert(flat_bytes.end(), bytes.begin(), bytes.end());
+            }
+        }
+        double entropy = higher_order_entropy(flat_bytes);
+
         // Progress reporting
         if ((epoch + 1) % 10 == 0 || epoch + 1 == config.epochs) {
             auto current_time = std::chrono::steady_clock::now();
@@ -169,7 +199,9 @@ int main(int argc, char* argv[]) {
                 current_time - start_time).count();
 
             std::cout << "Epoch " << std::setw(4) << (epoch + 1) << "/" << config.epochs
-                      << " - Elapsed: " << elapsed << "s" << std::endl;
+                      << " - Elapsed: " << elapsed << "s"
+                      << " - Entropy: " << std::fixed << std::setprecision(4) << entropy
+                      << std::endl;
         }
 
         // Save token snapshots at visualization intervals
@@ -181,6 +213,10 @@ int main(int argc, char* argv[]) {
             std::cout << "  Saving token snapshot: " << filename.str() << std::endl;
             grid.save_tokens_to_csv(filename.str(), epoch + 1);
         }
+
+        // Broadcast updates via WebSocket every epoch
+        std::string json_update = grid.to_json(epoch + 1, entropy);
+        ws_server.broadcast(json_update);
     }
 
     // Save final token snapshot

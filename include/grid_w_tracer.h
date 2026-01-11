@@ -7,6 +7,12 @@
 #include <string>
 #include <random>
 
+struct RGB {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+};
+
 class GridWithTracer {
 public:
     GridWithTracer(int width, int height, int program_size);
@@ -25,8 +31,14 @@ public:
     // Get program as bytes (for compatibility)
     std::vector<uint8_t> get_program_bytes(int x, int y) const;
 
+    // Convert program to RGB color for visualization
+    RGB program_to_color(const std::vector<uint8_t>& program) const;
+
     // Save all tokens to CSV file
     void save_tokens_to_csv(const std::string& filepath, int epoch_num) const;
+
+    // Generate JSON for visualization
+    std::string to_json(int epoch, double entropy) const;
 
     // Getters
     int get_width() const { return width; }

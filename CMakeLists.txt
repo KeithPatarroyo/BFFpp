@@ -107,10 +107,11 @@ add_executable(bffpp_grid_w_tracer
     src/metrics.cpp
     src/config.cpp
     src/grid_w_tracer.cpp
+    src/websocket_server.cpp
 )
 
 # Link libraries for grid with tracer
-target_link_libraries(bffpp_grid_w_tracer ${BROTLI_LIBRARIES} pthread)
+target_link_libraries(bffpp_grid_w_tracer ${BROTLI_LIBRARIES} pthread OpenSSL::SSL OpenSSL::Crypto)
 target_include_directories(bffpp_grid_w_tracer PRIVATE ${BROTLI_INCLUDE_DIRS})
 target_compile_options(bffpp_grid_w_tracer PRIVATE ${BROTLI_CFLAGS_OTHER})
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
