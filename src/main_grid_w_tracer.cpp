@@ -99,16 +99,7 @@ int main(int argc, char* argv[]) {
         }
 
         // Create spatial pairs using Von Neumann neighborhoods (r=2)
-        // For simplicity, create random pairs for now
-        std::vector<std::pair<int, int>> program_pairs;
-        int total_programs = grid.get_total_programs();
-        std::vector<int> indices(total_programs);
-        for (int i = 0; i < total_programs; i++) indices[i] = i;
-        std::shuffle(indices.begin(), indices.end(), rng);
-
-        for (size_t i = 0; i + 1 < indices.size(); i += 2) {
-            program_pairs.push_back({indices[i], indices[i + 1]});
-        }
+        std::vector<std::pair<int, int>> program_pairs = grid.create_spatial_pairs(2, rng);
 
         // Run simulations with multithreading
         std::vector<EmulatorResultWithTracer> results(program_pairs.size());
@@ -120,6 +111,11 @@ int main(int argc, char* argv[]) {
         for (size_t i = 0; i < program_pairs.size(); i++) {
             int idx_a = program_pairs[i].first;
             int idx_b = program_pairs[i].second;
+
+            // Skip mutation-only cases for now (will handle after simulation)
+            if (idx_a == -1) {
+                continue;
+            }
 
             threads.emplace_back(
                 run_simulation_pair_with_tracer,
@@ -145,50 +141,49 @@ int main(int argc, char* argv[]) {
 
         // Calculate finished ratio from results
         double finished_runs = 0;
-        for (size_t i = 0; i < results.size(); i++) {
-            if (results[i].state == "Finished") {
-                finished_runs += 1.0;
+        int executed_pairs = 0;
+        for (size_t i = 0; i < program_pairs.size(); i++) {
+            // Only count pairs that were actually executed (not mutation-only)
+            if (program_pairs[i].first != -1) {
+                if (results[i].state == "Finished") {
+                    finished_runs += 1.0;
+                }
+                executed_pairs++;
             }
         }
-        double finished_ratio = program_pairs.empty() ? 0.0 : finished_runs / program_pairs.size();
+        double finished_ratio = executed_pairs > 0 ? finished_runs / executed_pairs : 0.0;
 
-        // Selection: choose best from each pair
-        std::uniform_real_distribution<> mutation_dist(0.0, 1.0);
-        std::uniform_int_distribution<> byte_dist(0, 255);
-        std::uniform_int_distribution<> pos_dist(0, config.program_size - 1);
-
+        // Process results and update grid
         for (size_t i = 0; i < program_pairs.size(); i++) {
             int idx_a = program_pairs[i].first;
             int idx_b = program_pairs[i].second;
 
-            // Extract two halves from result
-            std::vector<Token> result_a(results[i].tape.begin(),
-                                        results[i].tape.begin() + config.program_size);
-            std::vector<Token> result_b(results[i].tape.begin() + config.program_size,
-                                        results[i].tape.end());
+            if (idx_a == -1) {
+                // Mutation-only case - just mutate program B
+                std::vector<Token> mutated = grid.mutate(soup[idx_b], config.mutation_rate, epoch + 1, rng);
+                int x_b = idx_b % grid.get_width();
+                int y_b = idx_b / grid.get_width();
+                grid.set_program(x_b, y_b, mutated);
+            } else {
+                // Normal case - extract results and mutate
+                std::vector<Token> result_a(results[i].tape.begin(),
+                                            results[i].tape.begin() + config.program_size);
+                std::vector<Token> result_b(results[i].tape.begin() + config.program_size,
+                                            results[i].tape.end());
 
-            // Apply mutation with new tokens
-            if (mutation_dist(rng) < config.mutation_rate) {
-                int mut_pos = pos_dist(rng);
-                uint8_t new_char = static_cast<uint8_t>(byte_dist(rng));
-                // Create new token with current epoch and mutation position
-                result_a[mut_pos] = Token(epoch + 1, mut_pos, new_char);
+                // Apply mutations
+                result_a = grid.mutate(result_a, config.mutation_rate, epoch + 1, rng);
+                result_b = grid.mutate(result_b, config.mutation_rate, epoch + 1, rng);
+
+                // Update grid with new token programs
+                int x_a = idx_a % grid.get_width();
+                int y_a = idx_a / grid.get_width();
+                int x_b = idx_b % grid.get_width();
+                int y_b = idx_b / grid.get_width();
+
+                grid.set_program(x_a, y_a, result_a);
+                grid.set_program(x_b, y_b, result_b);
             }
-
-            if (mutation_dist(rng) < config.mutation_rate) {
-                int mut_pos = pos_dist(rng);
-                uint8_t new_char = static_cast<uint8_t>(byte_dist(rng));
-                result_b[mut_pos] = Token(epoch + 1, mut_pos, new_char);
-            }
-
-            // Update grid with new token programs
-            int x_a = idx_a % grid.get_width();
-            int y_a = idx_a / grid.get_width();
-            int x_b = idx_b % grid.get_width();
-            int y_b = idx_b / grid.get_width();
-
-            grid.set_program(x_a, y_a, result_a);
-            grid.set_program(x_b, y_b, result_b);
         }
 
         // Calculate entropy for progress reporting
