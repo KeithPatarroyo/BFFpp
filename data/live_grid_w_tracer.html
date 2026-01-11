@@ -68,9 +68,16 @@
         }
 
         .grid-section {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .plot-section {
             flex: 1;
             display: flex;
             flex-direction: column;
+            min-width: 300px;
         }
 
         .section-title {
@@ -91,32 +98,44 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 10px;
         }
 
-        canvas {
+        #grid-canvas {
             image-rendering: pixelated;
             image-rendering: crisp-edges;
             max-width: 100%;
             max-height: 100%;
         }
 
+        #plot-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
         .status {
-            margin-top: 10px;
-            padding: 8px;
-            background: #1a1a1a;
-            border: 1px solid #00ff00;
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
             border-radius: 5px;
-            text-align: center;
-            font-size: 12px;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 1000;
         }
 
         .status.connected {
+            background: rgba(0, 255, 0, 0.2);
+            border: 1px solid #00ff00;
             color: #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
         }
 
         .status.disconnected {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid #ff0000;
             color: #ff0000;
-            border-color: #ff0000;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
         }
 
         .info-badge {
@@ -127,11 +146,22 @@
             margin-left: 10px;
             font-size: 10px;
         }
+
+        .blink {
+            animation: blink 0.5s ease-in-out;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
     </style>
 </head>
 <body>
+    <div class="status disconnected" id="status">DISCONNECTED</div>
+
     <div class="container">
-        <h1>🧬 BFF Grid with Token Tracking - Live Evolution</h1>
+        <h1>🧬 BFF GRID - TOKEN TRACKING - LIVE EVOLUTION 🧬</h1>
 
         <div class="stats">
             <div class="stat-row">
@@ -141,15 +171,29 @@
                 </div>
                 <div class="stat">
                     <div class="stat-label">GRID SIZE</div>
-                    <div class="stat-value" id="grid-size">-</div>
+                    <div class="stat-value" id="grid-size">0x0</div>
                 </div>
+                <div class="stat">
+                    <div class="stat-label">PROGRAMS</div>
+                    <div class="stat-value" id="total-programs">0</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">FPS</div>
+                    <div class="stat-value" id="fps">0</div>
+                </div>
+            </div>
+            <div class="stat-row">
                 <div class="stat">
                     <div class="stat-label">ENTROPY (HOE)</div>
-                    <div class="stat-value" id="entropy">0.000000</div>
+                    <div class="stat-value" id="entropy">0.000</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-label">TOTAL PROGRAMS</div>
-                    <div class="stat-value" id="total-programs">-</div>
+                    <div class="stat-label">TOTAL TOKENS</div>
+                    <div class="stat-value" id="total-tokens">0</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">UPDATES</div>
+                    <div class="stat-value" id="updates">0</div>
                 </div>
             </div>
         </div>
@@ -157,107 +201,258 @@
         <div class="visualization-area">
             <div class="grid-section">
                 <div class="section-title">
-                    EVOLUTIONARY GRID
+                    PROGRAM GRID
                     <span class="info-badge">Token lineage tracked per character</span>
                 </div>
                 <div class="canvas-container">
                     <canvas id="grid-canvas"></canvas>
                 </div>
             </div>
-        </div>
 
-        <div class="status disconnected" id="status">
-            ⚠ Connecting to server...
+            <div class="plot-section">
+                <div class="section-title">ENTROPY EVOLUTION</div>
+                <div class="canvas-container">
+                    <canvas id="plot-canvas"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        const canvas = document.getElementById('grid-canvas');
-        const ctx = canvas.getContext('2d');
-        const statusEl = document.getElementById('status');
+        const gridCanvas = document.getElementById('grid-canvas');
+        const gridCtx = gridCanvas.getContext('2d');
+        const plotCanvas = document.getElementById('plot-canvas');
+        const plotCtx = plotCanvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
 
         let gridWidth = 0;
         let gridHeight = 0;
-        let gridData = null;
+        let scale = 1;
+        let ws = null;
+        let updateCount = 0;
+        let lastUpdateTime = Date.now();
+        let fps = 0;
 
-        // WebSocket connection
-        const ws = new WebSocket('ws://localhost:8080');
+        // Entropy history for plotting
+        const entropyHistory = [];
+        const maxHistoryLength = 500;
 
-        ws.onopen = () => {
-            statusEl.textContent = '✓ Connected - Receiving live updates';
-            statusEl.className = 'status connected';
-        };
+        function connect() {
+            ws = new WebSocket('ws://localhost:8080');
 
-        ws.onclose = () => {
-            statusEl.textContent = '✗ Disconnected from server';
-            statusEl.className = 'status disconnected';
-        };
+            ws.onopen = () => {
+                console.log('Connected to server');
+                statusDiv.textContent = 'CONNECTED';
+                statusDiv.className = 'status connected';
+            };
 
-        ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            statusEl.textContent = '✗ Connection error';
-            statusEl.className = 'status disconnected';
-        };
+            ws.onclose = () => {
+                console.log('Disconnected from server');
+                statusDiv.textContent = 'DISCONNECTED';
+                statusDiv.className = 'status disconnected';
 
-        ws.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                updateVisualization(data);
-            } catch (error) {
-                console.error('Error parsing message:', error);
-            }
-        };
+                // Attempt to reconnect after 2 seconds
+                setTimeout(connect, 2000);
+            };
 
-        function updateVisualization(data) {
-            // Update stats
-            document.getElementById('epoch').textContent = data.epoch;
-            document.getElementById('grid-size').textContent = `${data.width}×${data.height}`;
-            document.getElementById('entropy').textContent = data.entropy.toFixed(6);
-            document.getElementById('total-programs').textContent = data.width * data.height;
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
 
-            // Update grid
-            gridWidth = data.width;
-            gridHeight = data.height;
-            gridData = data.grid;
-
-            drawGrid();
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    updateVisualization(data);
+                } catch (e) {
+                    console.error('Failed to parse message:', e);
+                }
+            };
         }
 
-        function drawGrid() {
-            if (!gridData) return;
+        function updateVisualization(data) {
+            // Update FPS
+            const now = Date.now();
+            const timeDiff = (now - lastUpdateTime) / 1000;
+            if (timeDiff > 0) {
+                fps = Math.round(1 / timeDiff);
+            }
+            lastUpdateTime = now;
+            updateCount++;
 
-            // Calculate canvas size to fit container
-            const container = canvas.parentElement;
-            const containerWidth = container.clientWidth - 20;
-            const containerHeight = container.clientHeight - 20;
+            // Update grid dimensions if changed
+            if (data.width !== gridWidth || data.height !== gridHeight) {
+                gridWidth = data.width;
+                gridHeight = data.height;
 
-            const cellSize = Math.floor(Math.min(
-                containerWidth / gridWidth,
-                containerHeight / gridHeight
-            ));
+                // Calculate scale to fit screen
+                const containerWidth = gridCanvas.parentElement.clientWidth - 20;
+                const containerHeight = gridCanvas.parentElement.clientHeight - 20;
+                const scaleX = Math.floor(containerWidth / gridWidth);
+                const scaleY = Math.floor(containerHeight / gridHeight);
+                scale = Math.max(1, Math.min(scaleX, scaleY));
 
-            const canvasWidth = gridWidth * cellSize;
-            const canvasHeight = gridHeight * cellSize;
+                gridCanvas.width = gridWidth * scale;
+                gridCanvas.height = gridHeight * scale;
 
-            canvas.width = canvasWidth;
-            canvas.height = canvasHeight;
+                console.log(`Grid: ${gridWidth}x${gridHeight}, Scale: ${scale}`);
+            }
+
+            // Update stats
+            document.getElementById('epoch').textContent = data.epoch || 0;
+            document.getElementById('grid-size').textContent = `${gridWidth}×${gridHeight}`;
+            document.getElementById('total-programs').textContent = gridWidth * gridHeight;
+            document.getElementById('total-tokens').textContent = (gridWidth * gridHeight * 32).toLocaleString();
+            document.getElementById('fps').textContent = fps;
+            document.getElementById('entropy').textContent = (data.entropy || 0).toFixed(3);
+            document.getElementById('updates').textContent = updateCount;
+
+            // Add to entropy history
+            if (data.epoch !== undefined && data.entropy !== undefined) {
+                entropyHistory.push({
+                    epoch: data.epoch,
+                    entropy: data.entropy
+                });
+
+                // Limit history length
+                if (entropyHistory.length > maxHistoryLength) {
+                    entropyHistory.shift();
+                }
+
+                // Draw entropy plot
+                drawEntropyPlot();
+            }
+
+            // Blink effect on grid canvas
+            gridCanvas.parentElement.classList.add('blink');
+            setTimeout(() => gridCanvas.parentElement.classList.remove('blink'), 100);
 
             // Draw grid
+            if (data.grid && data.grid.length > 0) {
+                drawGrid(data.grid);
+            }
+        }
+
+        function drawGrid(gridData) {
             for (let y = 0; y < gridHeight; y++) {
                 for (let x = 0; x < gridWidth; x++) {
-                    const [r, g, b] = gridData[y][x];
-                    ctx.fillStyle = `rgb(${r},${g},${b})`;
-                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                    if (gridData[y] && gridData[y][x]) {
+                        const [r, g, b] = gridData[y][x];
+                        gridCtx.fillStyle = `rgb(${r},${g},${b})`;
+                        gridCtx.fillRect(x * scale, y * scale, scale, scale);
+                    }
                 }
             }
         }
 
+        function drawEntropyPlot() {
+            if (entropyHistory.length === 0) return;
+
+            // Resize plot canvas to fit container
+            const container = plotCanvas.parentElement;
+            plotCanvas.width = container.clientWidth - 20;
+            plotCanvas.height = container.clientHeight - 20;
+
+            const width = plotCanvas.width;
+            const height = plotCanvas.height;
+            const padding = 40;
+
+            // Clear canvas
+            plotCtx.fillStyle = '#000';
+            plotCtx.fillRect(0, 0, width, height);
+
+            // Find min/max for scaling
+            let minEntropy = Math.min(...entropyHistory.map(h => h.entropy));
+            let maxEntropy = Math.max(...entropyHistory.map(h => h.entropy));
+            const minEpoch = entropyHistory[0].epoch;
+            const maxEpoch = entropyHistory[entropyHistory.length - 1].epoch;
+
+            // Add some padding to entropy range
+            const entropyRange = maxEntropy - minEntropy;
+            if (entropyRange < 0.1) {
+                minEntropy -= 0.05;
+                maxEntropy += 0.05;
+            }
+
+            // Draw axes
+            plotCtx.strokeStyle = '#00ff00';
+            plotCtx.lineWidth = 1;
+            plotCtx.beginPath();
+            plotCtx.moveTo(padding, padding);
+            plotCtx.lineTo(padding, height - padding);
+            plotCtx.lineTo(width - padding, height - padding);
+            plotCtx.stroke();
+
+            // Draw grid lines
+            plotCtx.strokeStyle = '#003300';
+            plotCtx.lineWidth = 0.5;
+            for (let i = 0; i <= 10; i++) {
+                const y = padding + (height - 2 * padding) * i / 10;
+                plotCtx.beginPath();
+                plotCtx.moveTo(padding, y);
+                plotCtx.lineTo(width - padding, y);
+                plotCtx.stroke();
+            }
+
+            // Draw entropy line
+            plotCtx.strokeStyle = '#00ff00';
+            plotCtx.lineWidth = 2;
+            plotCtx.beginPath();
+
+            for (let i = 0; i < entropyHistory.length; i++) {
+                const h = entropyHistory[i];
+                const x = padding + (width - 2 * padding) * i / (entropyHistory.length - 1 || 1);
+                const y = height - padding - (height - 2 * padding) * (h.entropy - minEntropy) / (maxEntropy - minEntropy || 1);
+
+                if (i === 0) {
+                    plotCtx.moveTo(x, y);
+                } else {
+                    plotCtx.lineTo(x, y);
+                }
+            }
+            plotCtx.stroke();
+
+            // Draw labels
+            plotCtx.fillStyle = '#00ff00';
+            plotCtx.font = '12px Courier New';
+            plotCtx.textAlign = 'right';
+
+            // Y-axis labels (entropy)
+            for (let i = 0; i <= 5; i++) {
+                const entropy = minEntropy + (maxEntropy - minEntropy) * i / 5;
+                const y = height - padding - (height - 2 * padding) * i / 5;
+                plotCtx.fillText(entropy.toFixed(3), padding - 5, y + 4);
+            }
+
+            // X-axis labels (epochs)
+            plotCtx.textAlign = 'center';
+            const numXLabels = 5;
+            for (let i = 0; i <= numXLabels; i++) {
+                const epoch = Math.round(minEpoch + (maxEpoch - minEpoch) * i / numXLabels);
+                const x = padding + (width - 2 * padding) * i / numXLabels;
+                plotCtx.fillText(epoch, x, height - padding + 20);
+            }
+
+            // Axis labels
+            plotCtx.save();
+            plotCtx.translate(15, height / 2);
+            plotCtx.rotate(-Math.PI / 2);
+            plotCtx.textAlign = 'center';
+            plotCtx.fillText('ENTROPY', 0, 0);
+            plotCtx.restore();
+
+            plotCtx.textAlign = 'center';
+            plotCtx.fillText('EPOCH', width / 2, height - 5);
+        }
+
         // Redraw on window resize
         window.addEventListener('resize', () => {
-            if (gridData) {
-                drawGrid();
+            if (entropyHistory.length > 0) {
+                drawEntropyPlot();
             }
         });
+
+        // Connect to server
+        connect();
     </script>
 </body>
 </html>
