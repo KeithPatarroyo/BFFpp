@@ -5,72 +5,6 @@
 #include <cstdint>
 #include <iomanip>
 
-void print_tape_with_tokens(const std::vector<Token>& tape, int head0_pos, int head1_pos, int pc_pos) {
-    std::cout << "Tape state (showing tokens):" << std::endl;
-    std::cout << "Pos | Char | Epoch | OrigPos | H0 | H1 | PC" << std::endl;
-    std::cout << "----+------+-------+---------+----+----+----" << std::endl;
-
-    for (size_t i = 0; i < tape.size(); i++) {
-        const Token& t = tape[i];
-        uint8_t ch = t.get_char();
-
-        std::cout << std::setw(3) << i << " | ";
-        std::cout << std::setw(4) << static_cast<int>(ch) << " | ";
-        std::cout << std::setw(5) << t.get_epoch() << " | ";
-        std::cout << std::setw(7) << t.get_position() << " | ";
-
-        // Mark head positions
-        if (static_cast<int>(i) == head0_pos) std::cout << " H0 ";
-        else std::cout << "    ";
-
-        if (static_cast<int>(i) == head1_pos) std::cout << " H1 ";
-        else std::cout << "    ";
-
-        if (static_cast<int>(i) == pc_pos) std::cout << " PC";
-        else std::cout << "   ";
-
-        // Show character representation
-        if (ch >= 32 && ch <= 126) {
-            std::cout << "  '" << static_cast<char>(ch) << "'";
-        }
-
-        std::cout << std::endl;
-    }
-    std::cout << std::endl;
-}
-
-void print_execution_state(int iteration, int head0_pos, int head1_pos, int pc_pos,
-                           const std::vector<Token>& tape) {
-    std::cout << "=== Iteration " << iteration << " ===" << std::endl;
-    std::cout << "Head0 at: " << head0_pos << ", Head1 at: " << head1_pos << ", PC at: " << pc_pos << std::endl;
-
-    if (pc_pos >= 0 && pc_pos < static_cast<int>(tape.size())) {
-        uint8_t current_instr = tape[pc_pos].get_char();
-        if (current_instr >= 32 && current_instr <= 126) {
-            std::cout << "Current instruction: '" << static_cast<char>(current_instr) << "'" << std::endl;
-        } else {
-            std::cout << "Current instruction: " << static_cast<int>(current_instr) << std::endl;
-        }
-    }
-
-    // Show tokens at head positions
-    if (head0_pos >= 0 && head0_pos < static_cast<int>(tape.size())) {
-        const Token& t0 = tape[head0_pos];
-        std::cout << "Token at Head0: char=" << static_cast<int>(t0.get_char())
-                  << ", epoch=" << t0.get_epoch()
-                  << ", origpos=" << t0.get_position() << std::endl;
-    }
-
-    if (head1_pos >= 0 && head1_pos < static_cast<int>(tape.size())) {
-        const Token& t1 = tape[head1_pos];
-        std::cout << "Token at Head1: char=" << static_cast<int>(t1.get_char())
-                  << ", epoch=" << t1.get_epoch()
-                  << ", origpos=" << t1.get_position() << std::endl;
-    }
-
-    std::cout << std::endl;
-}
-
 int main() {
     std::cout << "=== EMULATOR WITH TRACER - STEP BY STEP TEST ===" << std::endl;
     std::cout << std::endl;
@@ -94,14 +28,16 @@ int main() {
     std::vector<Token> tape = initialize_tokens_with_epoch(byte_tape, 0);
 
     std::cout << "=== INITIAL STATE ===" << std::endl;
-    print_tape_with_tokens(tape, 0, program1.size(), 0);
+    std::vector<uint8_t> display_tape = tokens_to_bytes(tape);
+    print_tape(display_tape, 0, 0, 0, true);
+    std::cout << std::endl;
 
     // Run emulation with verbose tracking
-    std::cout << "=== STARTING EXECUTION ===" << std::endl;
+    std::cout << "=== STARTING EXECUTION (100 iterations max) ===" << std::endl;
     std::cout << std::endl;
 
     int head0_pos = 0;
-    int head1_pos = program1.size();
+    int head1_pos = 0;
     int pc_pos = 0;
     int max_iter = 100;
     int iteration = 0;
@@ -121,7 +57,32 @@ int main() {
         }
 
         // Print state before executing instruction
-        print_execution_state(iteration, head0_pos, head1_pos, pc_pos, tape);
+        std::cout << "=== Iteration " << iteration << " ===" << std::endl;
+        std::cout << "Head0 at: " << head0_pos << ", Head1 at: " << head1_pos << ", PC at: " << pc_pos << std::endl;
+
+        if (pc_pos >= 0 && pc_pos < static_cast<int>(tape.size())) {
+            uint8_t current_instr = tape[pc_pos].get_char();
+            if (current_instr >= 32 && current_instr <= 126) {
+                std::cout << "Current instruction: '" << static_cast<char>(current_instr) << "'" << std::endl;
+            } else {
+                std::cout << "Current instruction: " << static_cast<int>(current_instr) << std::endl;
+            }
+        }
+
+        // Show tokens at head positions
+        if (head0_pos >= 0 && head0_pos < static_cast<int>(tape.size())) {
+            const Token& t0 = tape[head0_pos];
+            std::cout << "Token at Head0: char=" << static_cast<int>(t0.get_char())
+                      << ", epoch=" << t0.get_epoch()
+                      << ", origpos=" << t0.get_position() << std::endl;
+        }
+
+        if (head1_pos >= 0 && head1_pos < static_cast<int>(tape.size())) {
+            const Token& t1 = tape[head1_pos];
+            std::cout << "Token at Head1: char=" << static_cast<int>(t1.get_char())
+                      << ", epoch=" << t1.get_epoch()
+                      << ", origpos=" << t1.get_position() << std::endl;
+        }
 
         // Execute instruction (simplified version for tracking)
         switch (instruction) {
@@ -205,6 +166,11 @@ int main() {
             }
         }
 
+        // Display tape after instruction
+        display_tape = tokens_to_bytes(tape);
+        print_tape(display_tape, head0_pos, head1_pos, pc_pos, true);
+        std::cout << std::endl;
+
         pc_pos++;
         iteration++;
 
@@ -221,10 +187,11 @@ int main() {
     std::cout << std::endl;
 
     std::cout << "=== FINAL STATE ===" << std::endl;
-    print_tape_with_tokens(tape, head0_pos, head1_pos, pc_pos);
+    display_tape = tokens_to_bytes(tape);
+    print_tape(display_tape, head0_pos, head1_pos, pc_pos, true);
 
     // Show which tokens have been copied
-    std::cout << "=== TOKEN LINEAGE ANALYSIS ===" << std::endl;
+    std::cout << "\n=== TOKEN LINEAGE ANALYSIS ===" << std::endl;
     std::cout << "Tokens that originated from the first program (pos 0-31):" << std::endl;
     for (size_t i = 0; i < tape.size(); i++) {
         const Token& t = tape[i];
