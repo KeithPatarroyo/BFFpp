@@ -83,7 +83,7 @@ int main(int argc, char* argv[]) {
         }
     }
     double initial_entropy = higher_order_entropy(initial_flat);
-    std::string json_data = grid.to_json(0, initial_entropy);
+    std::string json_data = grid.to_json(0, initial_entropy, 0.0);
     ws_server.broadcast(json_data);
 
     // Main simulation loop
@@ -142,6 +142,15 @@ int main(int argc, char* argv[]) {
         for (auto& thread : threads) {
             thread.join();
         }
+
+        // Calculate finished ratio from results
+        double finished_runs = 0;
+        for (size_t i = 0; i < results.size(); i++) {
+            if (results[i].state == "Finished") {
+                finished_runs += 1.0;
+            }
+        }
+        double finished_ratio = program_pairs.empty() ? 0.0 : finished_runs / program_pairs.size();
 
         // Selection: choose best from each pair
         std::uniform_real_distribution<> mutation_dist(0.0, 1.0);
@@ -215,7 +224,7 @@ int main(int argc, char* argv[]) {
         }
 
         // Broadcast updates via WebSocket every epoch
-        std::string json_update = grid.to_json(epoch + 1, entropy);
+        std::string json_update = grid.to_json(epoch + 1, entropy, finished_ratio);
         ws_server.broadcast(json_update);
     }
 

@@ -163,7 +163,7 @@ void GridWithTracer::save_tokens_to_csv(const std::string& filepath, int epoch_n
     file.close();
 }
 
-std::string GridWithTracer::to_json(int epoch, double entropy) const {
+std::string GridWithTracer::to_json(int epoch, double entropy, double finished_ratio) const {
     std::ostringstream json;
 
     json << "{";
@@ -171,6 +171,7 @@ std::string GridWithTracer::to_json(int epoch, double entropy) const {
     json << "\"width\":" << width << ",";
     json << "\"height\":" << height << ",";
     json << "\"entropy\":" << std::fixed << std::setprecision(6) << entropy << ",";
+    json << "\"finished_ratio\":" << std::fixed << std::setprecision(6) << finished_ratio << ",";
     json << "\"grid\":[";
 
     // Write grid data as JSON array

@@ -116,7 +116,7 @@
         .status {
             position: absolute;
             top: 20px;
-            left: 20px;
+            right: 20px;
             padding: 10px 20px;
             border-radius: 5px;
             font-weight: bold;
@@ -186,6 +186,10 @@
                 <div class="stat">
                     <div class="stat-label">ENTROPY (HOE)</div>
                     <div class="stat-value" id="entropy">0.000</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">FINISHED RATIO</div>
+                    <div class="stat-value" id="finished-ratio">0.000</div>
                 </div>
                 <div class="stat">
                     <div class="stat-label">TOTAL TOKENS</div>
@@ -304,6 +308,7 @@
             document.getElementById('total-tokens').textContent = (gridWidth * gridHeight * 32).toLocaleString();
             document.getElementById('fps').textContent = fps;
             document.getElementById('entropy').textContent = (data.entropy || 0).toFixed(3);
+            document.getElementById('finished-ratio').textContent = (data.finished_ratio || 0).toFixed(3);
             document.getElementById('updates').textContent = updateCount;
 
             // Add to entropy history
