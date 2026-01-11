@@ -38,7 +38,7 @@ public:
     void save_tokens_to_csv(const std::string& filepath, int epoch_num) const;
 
     // Generate JSON for visualization
-    std::string to_json(int epoch, double entropy) const;
+    std::string to_json(int epoch, double entropy, double finished_ratio) const;
 
     // Getters
     int get_width() const { return width; }
