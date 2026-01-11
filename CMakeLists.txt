@@ -46,6 +46,18 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_emulator PRIVATE -Wall -Wextra -O3)
 endif()
 
+# Test executable for tracer emulator
+add_executable(test_emulator_w_tracer
+    src/test_emulator_w_tracer.cpp
+    src/emulator_w_tracer.cpp
+)
+
+# Link libraries for tracer test
+target_link_libraries(test_emulator_w_tracer pthread)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_emulator_w_tracer PRIVATE -Wall -Wextra -O3)
+endif()
+
 # Find OpenSSL for WebSocket
 find_package(OpenSSL REQUIRED)
 
@@ -85,4 +97,22 @@ target_include_directories(bffpp_darwin PRIVATE ${BROTLI_INCLUDE_DIRS})
 target_compile_options(bffpp_darwin PRIVATE ${BROTLI_CFLAGS_OTHER})
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(bffpp_darwin PRIVATE -Wall -Wextra -O3)
+endif()
+
+# Grid with tracer executable
+add_executable(bffpp_grid_w_tracer
+    src/main_grid_w_tracer.cpp
+    src/emulator_w_tracer.cpp
+    src/utils.cpp
+    src/metrics.cpp
+    src/config.cpp
+    src/grid_w_tracer.cpp
+)
+
+# Link libraries for grid with tracer
+target_link_libraries(bffpp_grid_w_tracer ${BROTLI_LIBRARIES} pthread)
+target_include_directories(bffpp_grid_w_tracer PRIVATE ${BROTLI_INCLUDE_DIRS})
+target_compile_options(bffpp_grid_w_tracer PRIVATE ${BROTLI_CFLAGS_OTHER})
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(bffpp_grid_w_tracer PRIVATE -Wall -Wextra -O3)
 endif()
