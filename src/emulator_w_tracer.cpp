@@ -58,6 +58,7 @@ EmulatorResultWithTracer emulate_w_tracer(
 
     // Valid BFF instructions
     const std::string instructions = "<>{}-+.,[]";
+    const uint8_t zero = '0';  // ASCII 48
 
     while (iteration < max_iter) {
         iteration++;
@@ -68,7 +69,11 @@ EmulatorResultWithTracer emulate_w_tracer(
         // Skip non-instruction characters
         if (instructions.find(instruction) == std::string::npos) {
             skipped++;
-            pc_pos = (pc_pos + 1) % tape_size;
+            pc_pos = pc_pos + 1;
+            if (pc_pos >= tape_size) {
+                state = "Finished";
+                break;
+            }
             continue;
         }
 
@@ -120,9 +125,9 @@ EmulatorResultWithTracer emulate_w_tracer(
                 break;
             }
 
-            case '[': {  // Jump forward if head 0 is zero
+            case '[': {  // Jump forward if head 0 is '0' (ASCII 48)
                 uint8_t value = tape[head0_pos].get_char();
-                if (value == 0) {
+                if (value == zero) {
                     int depth = 1;
                     for (int i = pc_pos + 1; i < tape_size; i++) {
                         char c = static_cast<char>(tape[i].get_char());
@@ -145,9 +150,9 @@ EmulatorResultWithTracer emulate_w_tracer(
                 break;
             }
 
-            case ']': {  // Jump backward if head 0 is non-zero
+            case ']': {  // Jump backward if head 0 is not '0' (ASCII 48)
                 uint8_t value = tape[head0_pos].get_char();
-                if (value != 0) {
+                if (value != zero) {
                     int depth = 1;
                     for (int i = pc_pos - 1; i >= 0; i--) {
                         char c = static_cast<char>(tape[i].get_char());

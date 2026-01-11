@@ -130,3 +130,82 @@ target_compile_options(bffpp_grid_w_tracer PRIVATE ${BROTLI_CFLAGS_OTHER})
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(bffpp_grid_w_tracer PRIVATE -Wall -Wextra -O3)
 endif()
+
+# Test grid comparison
+add_executable(test_grid_comparison
+    src/test_grid_comparison.cpp
+    src/emulator.cpp
+    src/emulator_w_tracer.cpp
+    src/utils.cpp
+    src/metrics.cpp
+    src/config.cpp
+    src/grid.cpp
+    src/grid_w_tracer.cpp
+)
+
+# Link libraries for test
+target_link_libraries(test_grid_comparison ${BROTLI_LIBRARIES} pthread)
+target_include_directories(test_grid_comparison PRIVATE ${BROTLI_INCLUDE_DIRS})
+target_compile_options(test_grid_comparison PRIVATE ${BROTLI_CFLAGS_OTHER})
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_grid_comparison PRIVATE -Wall -Wextra -O3)
+endif()
+
+# Test RNG debug
+add_executable(test_rng_debug
+    src/test_rng_debug.cpp
+    src/utils.cpp
+    src/grid.cpp
+    src/grid_w_tracer.cpp
+    src/emulator_w_tracer.cpp
+)
+
+# Link libraries for RNG debug test
+target_link_libraries(test_rng_debug pthread)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_rng_debug PRIVATE -Wall -Wextra -O3)
+endif()
+
+# Test epoch by epoch
+add_executable(test_epoch_by_epoch
+    src/test_epoch_by_epoch.cpp
+    src/emulator.cpp
+    src/emulator_w_tracer.cpp
+    src/utils.cpp
+    src/grid.cpp
+    src/grid_w_tracer.cpp
+)
+
+# Link libraries for epoch by epoch test
+target_link_libraries(test_epoch_by_epoch pthread)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_epoch_by_epoch PRIVATE -Wall -Wextra -O3)
+endif()
+
+# Test emulator equivalence
+add_executable(test_emulator_equivalence
+    src/test_emulator_equivalence.cpp
+    src/emulator.cpp
+    src/emulator_w_tracer.cpp
+    src/utils.cpp
+)
+
+# Link libraries
+target_link_libraries(test_emulator_equivalence pthread)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_emulator_equivalence PRIVATE -Wall -Wextra -O3)
+endif()
+
+# Test simple decrement
+add_executable(test_simple_decrement
+    src/test_simple_decrement.cpp
+    src/emulator.cpp
+    src/emulator_w_tracer.cpp
+    src/utils.cpp
+)
+
+# Link libraries
+target_link_libraries(test_simple_decrement pthread)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_simple_decrement PRIVATE -Wall -Wextra -O3)
+endif()

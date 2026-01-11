@@ -45,11 +45,11 @@ int main(int argc, char* argv[]) {
     }
 
     // Set random seed for reproducibility
-    std::mt19937 rng(config.random_seed);
+    seed_random(config.random_seed);
 
     // Create and initialize grid with tokens
     GridWithTracer grid(config.grid_width, config.grid_height, config.program_size);
-    grid.initialize_random(rng);
+    grid.initialize_random(get_rng());
 
     std::cout << "Starting grid simulation with token tracking:" << std::endl;
     std::cout << "  Grid size: " << config.grid_width << "x" << config.grid_height
@@ -90,16 +90,11 @@ int main(int argc, char* argv[]) {
     auto start_time = std::chrono::steady_clock::now();
 
     for (int epoch = 0; epoch < config.epochs; epoch++) {
-        // Get all programs (tokens)
-        std::vector<std::vector<Token>> soup;
-        for (int y = 0; y < grid.get_height(); y++) {
-            for (int x = 0; x < grid.get_width(); x++) {
-                soup.push_back(grid.get_program(x, y));
-            }
-        }
+        // Get all programs (tokens) as flat vector
+        std::vector<std::vector<Token>> soup = grid.get_all_programs();
 
         // Create spatial pairs using Von Neumann neighborhoods (r=2)
-        std::vector<std::pair<int, int>> program_pairs = grid.create_spatial_pairs(2, rng);
+        std::vector<std::pair<int, int>> program_pairs = grid.create_spatial_pairs(2, get_rng());
 
         // Run simulations with multithreading
         std::vector<EmulatorResultWithTracer> results(program_pairs.size());
@@ -153,17 +148,14 @@ int main(int argc, char* argv[]) {
         }
         double finished_ratio = executed_pairs > 0 ? finished_runs / executed_pairs : 0.0;
 
-        // Process results and update grid
+        // Process results and update soup
         for (size_t i = 0; i < program_pairs.size(); i++) {
             int idx_a = program_pairs[i].first;
             int idx_b = program_pairs[i].second;
 
             if (idx_a == -1) {
                 // Mutation-only case - just mutate program B
-                std::vector<Token> mutated = grid.mutate(soup[idx_b], config.mutation_rate, epoch + 1, rng);
-                int x_b = idx_b % grid.get_width();
-                int y_b = idx_b / grid.get_width();
-                grid.set_program(x_b, y_b, mutated);
+                soup[idx_b] = grid.mutate(soup[idx_b], config.mutation_rate, epoch + 1, get_rng());
             } else {
                 // Normal case - extract results and mutate
                 std::vector<Token> result_a(results[i].tape.begin(),
@@ -172,19 +164,13 @@ int main(int argc, char* argv[]) {
                                             results[i].tape.end());
 
                 // Apply mutations
-                result_a = grid.mutate(result_a, config.mutation_rate, epoch + 1, rng);
-                result_b = grid.mutate(result_b, config.mutation_rate, epoch + 1, rng);
-
-                // Update grid with new token programs
-                int x_a = idx_a % grid.get_width();
-                int y_a = idx_a / grid.get_width();
-                int x_b = idx_b % grid.get_width();
-                int y_b = idx_b / grid.get_width();
-
-                grid.set_program(x_a, y_a, result_a);
-                grid.set_program(x_b, y_b, result_b);
+                soup[idx_a] = grid.mutate(result_a, config.mutation_rate, epoch + 1, get_rng());
+                soup[idx_b] = grid.mutate(result_b, config.mutation_rate, epoch + 1, get_rng());
             }
         }
+
+        // Update grid with all new programs at once
+        grid.set_all_programs(soup);
 
         // Calculate entropy for progress reporting
         std::vector<uint8_t> flat_bytes;

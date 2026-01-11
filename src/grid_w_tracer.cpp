@@ -1,4 +1,5 @@
 #include "grid_w_tracer.h"
+#include "grid.h"  // For RGB struct
 #include "utils.h"
 #include <fstream>
 #include <iomanip>
@@ -50,6 +51,14 @@ const std::vector<Token>& GridWithTracer::get_program(int x, int y) const {
 
 void GridWithTracer::set_program(int x, int y, const std::vector<Token>& program) {
     grid_data[index(x, y)] = program;
+}
+
+std::vector<std::vector<Token>> GridWithTracer::get_all_programs() const {
+    return grid_data;
+}
+
+void GridWithTracer::set_all_programs(const std::vector<std::vector<Token>>& programs) {
+    grid_data = programs;
 }
 
 std::vector<uint8_t> GridWithTracer::get_program_bytes(int x, int y) const {
