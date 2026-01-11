@@ -58,6 +58,19 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_emulator_w_tracer PRIVATE -Wall -Wextra -O3)
 endif()
 
+# Verbose test executable for tracer emulator
+add_executable(test_emulator_w_tracer_verbose
+    src/test_emulator_w_tracer_verbose.cpp
+    src/emulator_w_tracer.cpp
+    src/utils.cpp
+)
+
+# Link libraries for verbose tracer test
+target_link_libraries(test_emulator_w_tracer_verbose pthread)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_emulator_w_tracer_verbose PRIVATE -Wall -Wextra -O3)
+endif()
+
 # Find OpenSSL for WebSocket
 find_package(OpenSSL REQUIRED)
 
