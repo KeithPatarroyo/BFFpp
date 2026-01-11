@@ -15,6 +15,11 @@ struct RGB {
 
 class GridWithTracer {
 public:
+    struct Cell {
+        int x;
+        int y;
+    };
+
     GridWithTracer(int width, int height, int program_size);
 
     // Initialize grid with random programs and tokens (epoch 0)
@@ -39,6 +44,16 @@ public:
 
     // Generate JSON for visualization
     std::string to_json(int epoch, double entropy, double finished_ratio) const;
+
+    // Von Neumann neighborhood
+    std::vector<Cell> get_von_neumann_neighbors(int x, int y, int radius) const;
+
+    // Create spatial pairs for pairing programs
+    std::vector<std::pair<int, int>> create_spatial_pairs(int neighborhood_radius, std::mt19937& rng);
+
+    // Mutate a program (creates new token with given epoch)
+    std::vector<Token> mutate(const std::vector<Token>& program, double mutation_rate,
+                              uint64_t epoch, std::mt19937& rng);
 
     // Getters
     int get_width() const { return width; }
