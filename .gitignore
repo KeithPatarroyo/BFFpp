@@ -19,6 +19,7 @@ data/*.txt
 data/*.csv
 data/*.png
 data/visualizations/
+data/tokens/
 
 # Keep directory structure
 !data/.gitkeep

@@ -1,0 +1,12 @@
+# Small test configuration for token tracking
+program_size: 32
+mutation_rate: 0.001
+max_iterations: 8192
+eval_interval: 10
+visualization_interval: 5   # Save tokens every 5 epochs
+random_seed: 42
+
+# Small grid for testing
+grid_width: 10
+grid_height: 10
+epochs: 20  # Run for 20 epochs
