@@ -1,0 +1,12 @@
+# Test config for comparing main_grid and main_grid_w_tracer
+random_seed: 42
+grid_width: 10
+grid_height: 10
+program_size: 32
+epochs: 5
+mutation_rate: 0.001
+read_head_position: 0
+write_head_position: 32
+eval_interval: 1
+num_print_programs: 0
+visualization_interval: 10

@@ -7,11 +7,8 @@
 #include <string>
 #include <random>
 
-struct RGB {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-};
+// Forward declare RGB (defined in grid.h)
+struct RGB;
 
 class GridWithTracer {
 public:
@@ -32,6 +29,12 @@ public:
 
     // Set program tokens at position
     void set_program(int x, int y, const std::vector<Token>& program);
+
+    // Get all programs as a flat vector
+    std::vector<std::vector<Token>> get_all_programs() const;
+
+    // Set all programs from flat vector
+    void set_all_programs(const std::vector<std::vector<Token>>& programs);
 
     // Get program as bytes (for compatibility)
     std::vector<uint8_t> get_program_bytes(int x, int y) const;
@@ -60,9 +63,6 @@ public:
     int get_height() const { return height; }
     int get_program_size() const { return program_size; }
     int get_total_programs() const { return width * height; }
-
-    // Get all tokens (flattened)
-    const std::vector<std::vector<Token>>& get_all_programs() const { return grid_data; }
 
 private:
     int width;
