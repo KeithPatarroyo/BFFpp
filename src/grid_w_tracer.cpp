@@ -285,13 +285,14 @@ std::vector<Token> GridWithTracer::mutate(const std::vector<Token>& program, dou
 
     std::uniform_real_distribution<> mutation_dist(0.0, 1.0);
     std::uniform_int_distribution<> byte_dist(0, 255);
-    std::uniform_int_distribution<> pos_dist(0, program_size - 1);
 
-    if (mutation_dist(rng) < mutation_rate) {
-        int mut_pos = pos_dist(rng);
-        uint8_t new_char = static_cast<uint8_t>(byte_dist(rng));
-        // Create new token with given epoch and mutation position
-        mutated[mut_pos] = Token(epoch, mut_pos, new_char);
+    // Check each position independently against mutation rate
+    for (size_t i = 0; i < mutated.size(); i++) {
+        if (mutation_dist(rng) < mutation_rate) {
+            uint8_t new_char = static_cast<uint8_t>(byte_dist(rng));
+            // Create new token with given epoch and this position
+            mutated[i] = Token(epoch, static_cast<uint16_t>(i), new_char);
+        }
     }
 
     return mutated;
