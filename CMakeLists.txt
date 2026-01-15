@@ -209,3 +209,17 @@ target_link_libraries(test_simple_decrement pthread)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(test_simple_decrement PRIVATE -Wall -Wextra -O3)
 endif()
+
+# Analyze neighborhood HOE
+add_executable(analyze_neighborhood_hoe
+    src/analyze_neighborhood_hoe.cpp
+    src/metrics.cpp
+)
+
+# Link libraries
+target_link_libraries(analyze_neighborhood_hoe ${BROTLI_LIBRARIES} pthread)
+target_include_directories(analyze_neighborhood_hoe PRIVATE ${BROTLI_INCLUDE_DIRS})
+target_compile_options(analyze_neighborhood_hoe PRIVATE ${BROTLI_CFLAGS_OTHER})
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(analyze_neighborhood_hoe PRIVATE -Wall -Wextra -O3)
+endif()

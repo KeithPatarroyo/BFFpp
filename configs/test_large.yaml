@@ -1,0 +1,12 @@
+# Larger test config for performance testing
+random_seed: 42
+grid_width: 50
+grid_height: 50
+program_size: 32
+epochs: 10
+mutation_rate: 0.001
+read_head_position: 0
+write_head_position: 32
+eval_interval: 2
+num_print_programs: 0
+visualization_interval: 5
