@@ -90,6 +90,11 @@ int main(int argc, char* argv[]) {
     auto start_time = std::chrono::steady_clock::now();
 
     for (int epoch = 0; epoch < config.epochs; epoch++) {
+        // Check if paused
+        while (ws_server.is_paused()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
         // Get all programs (tokens) as flat vector
         std::vector<std::vector<Token>> soup = grid.get_all_programs();
 
