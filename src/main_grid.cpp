@@ -81,6 +81,11 @@ int main(int argc, char* argv[]) {
 
     // Main simulation loop
     for (int epoch = 0; epoch < config.epochs; epoch++) {
+        // Check if paused
+        while (ws_server.is_paused()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+
         // Get all programs as flat vector
         std::vector<std::vector<uint8_t>> soup = grid.get_all_programs();
 
