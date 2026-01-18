@@ -15,6 +15,12 @@
 #include <iomanip>
 #include <sstream>
 
+// Check if a character is a valid BF instruction
+bool is_instruction(char ch) {
+    const std::string instructions = ",.[]{}()<>+-";
+    return instructions.find(ch) != std::string::npos;
+}
+
 void run_simulation_pair(
     const std::vector<uint8_t>& programA,
     const std::vector<uint8_t>& programB,
@@ -234,9 +240,11 @@ int main(int argc, char* argv[]) {
                                    << x << ","
                                    << y << ",\"";
 
-                        // Write program as string
+                        // Write program as string (clean non-instructions)
                         for (uint8_t ch : program) {
-                            pairing_file << static_cast<char>(ch);
+                            char clean_ch = is_instruction(static_cast<char>(ch)) ?
+                                          static_cast<char>(ch) : ' ';
+                            pairing_file << clean_ch;
                         }
 
                         pairing_file << "\"," << combined_x << "," << combined_y << "\n";
