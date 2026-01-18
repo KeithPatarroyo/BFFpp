@@ -223,3 +223,16 @@ target_compile_options(analyze_neighborhood_hoe PRIVATE ${BROTLI_CFLAGS_OTHER})
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(analyze_neighborhood_hoe PRIVATE -Wall -Wextra -O3)
 endif()
+
+# Forward pass analysis
+add_executable(forward_pass_analysis
+    src/forward_pass_analysis.cpp
+    src/emulator.cpp
+    src/utils.cpp
+)
+
+# Link libraries
+target_link_libraries(forward_pass_analysis pthread)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(forward_pass_analysis PRIVATE -Wall -Wextra -O3)
+endif()
