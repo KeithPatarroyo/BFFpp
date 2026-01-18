@@ -6,7 +6,9 @@
 #include "websocket_server.h"
 
 #include <iostream>
+#include <fstream>
 #include <vector>
+#include <map>
 #include <random>
 #include <algorithm>
 #include <thread>
@@ -178,6 +180,73 @@ int main(int argc, char* argv[]) {
 
         // Update grid with new programs
         grid.set_all_programs(soup);
+
+        // Save pairing information starting at epoch 16324
+        const int PAIRING_START_EPOCH = 16324;
+        if (epoch + 1 >= PAIRING_START_EPOCH) {
+            // Build map: position index -> combined position index
+            std::map<int, int> pairing_map;
+            for (const auto& pair : program_pairs) {
+                int idx_a = pair.first;
+                int idx_b = pair.second;
+
+                if (idx_a == -1) {
+                    // Mutation-only: no pairing
+                    pairing_map[idx_b] = -1;
+                } else {
+                    // Paired: each points to the other
+                    pairing_map[idx_a] = idx_b;
+                    pairing_map[idx_b] = idx_a;
+                }
+            }
+
+            // Save pairing CSV
+            std::stringstream pairing_filename;
+            pairing_filename << "data/pairings/pairings_epoch_"
+                           << std::setfill('0') << std::setw(4) << (epoch + 1) << ".csv";
+
+            // Create directory if needed
+            system("mkdir -p data/pairings");
+
+            std::ofstream pairing_file(pairing_filename.str());
+            if (pairing_file.is_open()) {
+                // Write header
+                pairing_file << "epoch,position_x,position_y,program,combined_x,combined_y\n";
+
+                // Write data for each position
+                for (int y = 0; y < grid.get_height(); y++) {
+                    for (int x = 0; x < grid.get_width(); x++) {
+                        int idx = y * grid.get_width() + x;
+                        const auto& program = soup[idx];
+
+                        // Get combined position
+                        int combined_idx = pairing_map[idx];
+                        int combined_x = -1;
+                        int combined_y = -1;
+
+                        if (combined_idx >= 0) {
+                            combined_y = combined_idx / grid.get_width();
+                            combined_x = combined_idx % grid.get_width();
+                        }
+
+                        // Write row
+                        pairing_file << (epoch + 1) << ","
+                                   << x << ","
+                                   << y << ",\"";
+
+                        // Write program as string
+                        for (uint8_t ch : program) {
+                            pairing_file << static_cast<char>(ch);
+                        }
+
+                        pairing_file << "\"," << combined_x << "," << combined_y << "\n";
+                    }
+                }
+
+                pairing_file.close();
+                std::cout << "\tSaved pairing data: " << pairing_filename.str() << std::endl;
+            }
+        }
 
         // Calculate stats
         std::vector<uint8_t> flat_soup;
