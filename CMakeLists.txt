@@ -236,3 +236,12 @@ target_link_libraries(forward_pass_analysis pthread)
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(forward_pass_analysis PRIVATE -Wall -Wextra -O3)
 endif()
+
+# Clean pairing CSV utility
+add_executable(clean_pairing_csv
+    src/clean_pairing_csv.cpp
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(clean_pairing_csv PRIVATE -Wall -Wextra -O3)
+endif()
