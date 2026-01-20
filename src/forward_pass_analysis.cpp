@@ -16,28 +16,23 @@
 // Thread-safe cache for program execution results
 class ProgramCache {
 public:
-    struct CacheEntry {
-        bool is_replicator;
-        std::vector<uint8_t> program;
-    };
-
-    bool has(const std::vector<uint8_t>& program) {
+    bool has(const std::string& program) {
         std::lock_guard<std::mutex> lock(cache_mutex);
         return cache.count(program) > 0;
     }
 
-    bool is_replicator(const std::vector<uint8_t>& program) {
+    bool is_replicator(const std::string& program) {
         std::lock_guard<std::mutex> lock(cache_mutex);
         auto it = cache.find(program);
         if (it != cache.end()) {
-            return it->second.is_replicator;
+            return it->second;
         }
         return false;
     }
 
-    void add(const std::vector<uint8_t>& program, bool is_replicator) {
+    void add(const std::string& program, bool is_replicator) {
         std::lock_guard<std::mutex> lock(cache_mutex);
-        cache[program] = {is_replicator, program};
+        cache[program] = is_replicator;
     }
 
     size_t size() const {
@@ -46,7 +41,7 @@ public:
     }
 
 private:
-    std::map<std::vector<uint8_t>, CacheEntry> cache;
+    std::map<std::string, bool> cache;
     mutable std::mutex cache_mutex;
 };
 
@@ -55,7 +50,7 @@ struct ProgramLocation {
     int epoch;
     int grid_x;
     int grid_y;
-    std::vector<uint8_t> program;
+    std::string program;
 
     bool operator<(const ProgramLocation& other) const {
         if (epoch != other.epoch) return epoch < other.epoch;
@@ -64,7 +59,7 @@ struct ProgramLocation {
     }
 };
 
-// Get Von Neumann neighbors with proper boundary checking
+// Get Von Neumann neighbors with proper boundary checking (r=2)
 std::vector<std::pair<int, int>> get_von_neumann_neighbors(
     int x, int y, int width, int height, int radius = 2
 ) {
@@ -75,7 +70,7 @@ std::vector<std::pair<int, int>> get_von_neumann_neighbors(
             // Calculate Manhattan distance
             int manhattan_dist = std::abs(dx) + std::abs(dy);
 
-            // Include cell itself and neighbors within radius
+            // Include neighbors within radius (not the cell itself)
             if (manhattan_dist > 0 && manhattan_dist <= radius) {
                 int nx = x + dx;
                 int ny = y + dy;
@@ -91,68 +86,72 @@ std::vector<std::pair<int, int>> get_von_neumann_neighbors(
     return neighbors;
 }
 
-// Read program from CSV file at specific position
-std::vector<uint8_t> get_program_from_csv(
-    const std::string& csv_path,
-    int grid_x,
-    int grid_y
-) {
+// Parse a CSV line with proper quote handling
+std::vector<std::string> parse_csv_line(const std::string& line) {
+    std::vector<std::string> fields;
+    std::string field;
+    bool in_quotes = false;
+
+    for (size_t i = 0; i < line.size(); i++) {
+        char c = line[i];
+
+        if (c == '"') {
+            in_quotes = !in_quotes;
+        } else if (c == ',' && !in_quotes) {
+            fields.push_back(field);
+            field.clear();
+        } else {
+            field += c;
+        }
+    }
+    fields.push_back(field);
+
+    return fields;
+}
+
+// Read all programs from a pairing CSV file
+std::map<std::pair<int, int>, std::string> read_pairing_csv(const std::string& csv_path) {
+    std::map<std::pair<int, int>, std::string> programs;
     std::ifstream file(csv_path);
+
     if (!file.is_open()) {
         throw std::runtime_error("Could not open file: " + csv_path);
     }
 
-    std::vector<uint8_t> program;
     std::string line;
-
     // Skip header
     std::getline(file, line);
 
-    // Read all lines and find matching position
-    std::map<int, uint8_t> position_map;
-
     while (std::getline(file, line)) {
-        std::stringstream ss(line);
-        std::string field;
-        std::vector<std::string> fields;
+        auto fields = parse_csv_line(line);
 
-        // Parse CSV line
-        while (std::getline(ss, field, ',')) {
-            // Remove quotes if present
-            if (!field.empty() && field.front() == '"') {
-                field = field.substr(1, field.size() - 2);
-            }
-            fields.push_back(field);
-        }
-
-        if (fields.size() < 7) continue;
+        if (fields.size() < 5) continue;
 
         int x = std::stoi(fields[1]);
         int y = std::stoi(fields[2]);
-        int pos = std::stoi(fields[3]);
-        uint8_t character = static_cast<uint8_t>(std::stoi(fields[6]));
+        std::string program = fields[3];
 
-        // If this is the right position, store character at its position
-        if (x == grid_x && y == grid_y) {
-            position_map[pos] = character;
-        }
+        programs[{x, y}] = program;
     }
 
-    // Convert map to vector (in order)
-    if (!position_map.empty()) {
-        int max_pos = position_map.rbegin()->first;
-        program.resize(max_pos + 1);
-        for (const auto& [pos, ch] : position_map) {
-            program[pos] = ch;
-        }
-    }
+    return programs;
+}
 
+// Convert string program to vector<uint8_t>
+std::vector<uint8_t> string_to_program(const std::string& str) {
+    std::vector<uint8_t> program;
+    for (char c : str) {
+        program.push_back(static_cast<uint8_t>(c));
+    }
     return program;
 }
 
 // Check if a program is a self-replicator
-bool check_replicator(const std::vector<uint8_t>& program, int max_iter = 1024) {
-    if (program.empty()) return false;
+bool check_replicator(const std::string& program_str, int max_iter = 1024) {
+    if (program_str.empty()) return false;
+
+    // Convert to vector
+    std::vector<uint8_t> program = string_to_program(program_str);
 
     // Create tape: program1 + program2 (filled with '0')
     std::vector<uint8_t> tape = program;
@@ -162,6 +161,8 @@ bool check_replicator(const std::vector<uint8_t>& program, int max_iter = 1024) 
     EmulatorResult result = emulate(tape, 0, static_cast<int>(program.size()), 0, max_iter, 0);
 
     // Check if first half equals second half
+    if (result.tape.size() < program.size() * 2) return false;
+
     size_t mid = result.tape.size() / 2;
     for (size_t i = 0; i < mid; i++) {
         if (result.tape[i] != result.tape[mid + i]) {
@@ -172,31 +173,15 @@ bool check_replicator(const std::vector<uint8_t>& program, int max_iter = 1024) 
     return true;
 }
 
-// Calculate similarity between two programs
-double calculate_similarity(const std::vector<uint8_t>& prog1, const std::vector<uint8_t>& prog2) {
-    if (prog1.size() != prog2.size()) return 0.0;
-    if (prog1.empty()) return 0.0;
-
-    int matches = 0;
-    for (size_t i = 0; i < prog1.size(); i++) {
-        if (prog1[i] == prog2[i]) {
-            matches++;
-        }
-    }
-
-    return static_cast<double>(matches) / prog1.size();
-}
-
-// Find replicators using forward pass analysis
+// Find replicators using forward pass analysis with pairing data
 std::map<int, std::vector<ProgramLocation>> find_replicators(
-    const std::string& tokens_dir,
+    const std::string& pairings_dir,
     int start_epoch,
     int grid_x,
     int grid_y,
     int last_epoch,
     int grid_width,
     int grid_height,
-    double similarity_threshold = 0.9,
     unsigned int num_threads = 0
 ) {
     if (num_threads == 0) {
@@ -204,12 +189,11 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
         if (num_threads == 0) num_threads = 4;
     }
 
-    std::cout << "Forward Pass Analysis" << std::endl;
+    std::cout << "Forward Pass Analysis (Pairing-based)" << std::endl;
     std::cout << "Start epoch: " << start_epoch << std::endl;
     std::cout << "Start position: (" << grid_x << ", " << grid_y << ")" << std::endl;
     std::cout << "Last epoch: " << last_epoch << std::endl;
     std::cout << "Grid size: " << grid_width << "x" << grid_height << std::endl;
-    std::cout << "Similarity threshold: " << similarity_threshold << std::endl;
     std::cout << "Threads: " << num_threads << std::endl;
     std::cout << std::endl;
 
@@ -219,19 +203,24 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
     // Result storage: epoch -> list of replicators
     std::map<int, std::vector<ProgramLocation>> replicators_by_epoch;
 
-    // Get initial program
+    // Get initial program from pairing CSV
     std::stringstream csv_path;
-    csv_path << tokens_dir << "/tokens_epoch_" << std::setfill('0') << std::setw(4) << start_epoch << ".csv";
+    csv_path << pairings_dir << "/pairings_epoch_"
+             << std::setfill('0') << std::setw(4) << start_epoch << ".csv";
 
-    std::vector<uint8_t> initial_program = get_program_from_csv(csv_path.str(), grid_x, grid_y);
+    auto programs = read_pairing_csv(csv_path.str());
+    auto it = programs.find({grid_x, grid_y});
 
-    if (initial_program.empty()) {
+    if (it == programs.end()) {
         std::cerr << "Error: Could not find program at initial position" << std::endl;
         return replicators_by_epoch;
     }
 
+    std::string initial_program = it->second;
+
     // Verify initial program is a replicator
     std::cout << "Verifying initial program is a replicator..." << std::endl;
+    std::cout << "Program: " << initial_program << std::endl;
     bool is_rep = check_replicator(initial_program);
     if (!is_rep) {
         std::cerr << "Warning: Initial program is not a self-replicator!" << std::endl;
@@ -263,16 +252,25 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
             continue;
         }
 
+        // Get CSV path for next epoch
+        std::stringstream next_csv_path;
+        next_csv_path << pairings_dir << "/pairings_epoch_"
+                     << std::setfill('0') << std::setw(4) << (epoch + 1) << ".csv";
+
+        // Read next epoch programs
+        std::map<std::pair<int, int>, std::string> next_programs;
+        try {
+            next_programs = read_pairing_csv(next_csv_path.str());
+        } catch (const std::exception& e) {
+            std::cerr << "  Error reading next epoch: " << e.what() << std::endl;
+            break;
+        }
+
         // Candidate programs to check
         std::vector<ProgramLocation> candidates;
         std::set<std::pair<int, int>> checked_positions;
 
-        // Get CSV path for next epoch
-        std::stringstream next_csv_path;
-        next_csv_path << tokens_dir << "/tokens_epoch_"
-                     << std::setfill('0') << std::setw(4) << (epoch + 1) << ".csv";
-
-        // For each replicator, get neighbors
+        // For each replicator, get neighbors in the next epoch
         for (const auto& replicator : current_replicators) {
             auto neighbors = get_von_neumann_neighbors(
                 replicator.grid_x, replicator.grid_y,
@@ -285,28 +283,23 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
                 checked_positions.insert({nx, ny});
 
                 // Get program at next epoch
-                std::vector<uint8_t> neighbor_program = get_program_from_csv(
-                    next_csv_path.str(), nx, ny
-                );
+                auto prog_it = next_programs.find({nx, ny});
+                if (prog_it == next_programs.end()) continue;
 
+                std::string neighbor_program = prog_it->second;
                 if (neighbor_program.empty()) continue;
 
-                // Check similarity
-                double similarity = calculate_similarity(replicator.program, neighbor_program);
-
-                if (similarity >= similarity_threshold) {
-                    ProgramLocation candidate;
-                    candidate.epoch = epoch + 1;
-                    candidate.grid_x = nx;
-                    candidate.grid_y = ny;
-                    candidate.program = neighbor_program;
-                    candidates.push_back(candidate);
-                }
+                // Add as candidate (we'll check all of them for self-replication)
+                ProgramLocation candidate;
+                candidate.epoch = epoch + 1;
+                candidate.grid_x = nx;
+                candidate.grid_y = ny;
+                candidate.program = neighbor_program;
+                candidates.push_back(candidate);
             }
         }
 
-        std::cout << "  Candidates (>=" << (similarity_threshold * 100) << "% similar): "
-                  << candidates.size() << std::endl;
+        std::cout << "  Candidates in neighborhood: " << candidates.size() << std::endl;
 
         // Check candidates in parallel
         std::vector<std::future<std::pair<ProgramLocation, bool>>> futures;
@@ -321,7 +314,7 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
                 continue;
             }
 
-            // Submit to thread pool
+            // Wait if too many threads are running
             if (futures.size() >= num_threads) {
                 // Wait for one to complete
                 auto result = futures.front().get();
@@ -334,6 +327,7 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
                 }
             }
 
+            // Submit to thread pool
             futures.push_back(std::async(std::launch::async, [candidate]() {
                 bool is_rep = check_replicator(candidate.program);
                 return std::make_pair(candidate, is_rep);
@@ -360,17 +354,17 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
 
 int main(int argc, char* argv[]) {
     // Parse command line arguments
-    if (argc < 6) {
+    if (argc < 8) {
         std::cerr << "Usage: " << argv[0]
-                  << " <tokens_dir> <start_epoch> <grid_x> <grid_y> <last_epoch> <grid_width> <grid_height> [similarity_threshold] [num_threads]"
+                  << " <pairings_dir> <start_epoch> <grid_x> <grid_y> <last_epoch> <grid_width> <grid_height> [num_threads]"
                   << std::endl;
         std::cerr << "Example: " << argv[0]
-                  << " data/tokens 16324 14 27 16327 240 135 0.9 8"
+                  << " data/pairings 16324 14 27 16327 240 135 8"
                   << std::endl;
         return 1;
     }
 
-    std::string tokens_dir = argv[1];
+    std::string pairings_dir = argv[1];
     int start_epoch = std::atoi(argv[2]);
     int grid_x = std::atoi(argv[3]);
     int grid_y = std::atoi(argv[4]);
@@ -378,26 +372,20 @@ int main(int argc, char* argv[]) {
     int grid_width = std::atoi(argv[6]);
     int grid_height = std::atoi(argv[7]);
 
-    double similarity_threshold = 0.9;
-    if (argc > 8) {
-        similarity_threshold = std::atof(argv[8]);
-    }
-
     unsigned int num_threads = 0;
-    if (argc > 9) {
-        num_threads = std::atoi(argv[9]);
+    if (argc > 8) {
+        num_threads = std::atoi(argv[8]);
     }
 
     // Run forward pass analysis
     auto replicators = find_replicators(
-        tokens_dir,
+        pairings_dir,
         start_epoch,
         grid_x,
         grid_y,
         last_epoch,
         grid_width,
         grid_height,
-        similarity_threshold,
         num_threads
     );
 
@@ -411,16 +399,14 @@ int main(int argc, char* argv[]) {
     std::cout << "\nTotal replicators found: " << total_replicators << std::endl;
 
     // Save results to file
-    std::string output_path = tokens_dir + "/forward_pass_results.csv";
+    std::string output_path = pairings_dir + "/forward_pass_results.csv";
     std::ofstream out(output_path);
     if (out.is_open()) {
         out << "epoch,grid_x,grid_y,program\n";
         for (const auto& [epoch, reps] : replicators) {
             for (const auto& rep : reps) {
                 out << rep.epoch << "," << rep.grid_x << "," << rep.grid_y << ",\"";
-                for (uint8_t ch : rep.program) {
-                    out << static_cast<char>(ch);
-                }
+                out << rep.program;
                 out << "\"\n";
             }
         }
