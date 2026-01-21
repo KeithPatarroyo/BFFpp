@@ -511,6 +511,12 @@ int main(int argc, char* argv[]) {
     std::cout << "\nTotal replicators found: " << total_replicators << std::endl;
     std::cout << "Unique replicator programs: " << unique_programs.size() << std::endl;
 
+    std::cout << "\nUnique replicator programs:" << std::endl;
+    int prog_num = 1;
+    for (const auto& program : unique_programs) {
+        std::cout << "  [" << prog_num++ << "] " << program << std::endl;
+    }
+
     // Save results to file
     std::string output_path = pairings_dir + "/forward_pass_results.csv";
     std::ofstream out(output_path);
