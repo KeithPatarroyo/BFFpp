@@ -497,19 +497,34 @@ int main(int argc, char* argv[]) {
     std::cout << "=== Summary ===" << std::endl;
     int total_replicators = 0;
     std::set<std::string> unique_programs;
+    std::map<std::string, ProgramLocation> first_appearance;
 
     for (const auto& [epoch, reps] : replicators) {
         std::cout << "Epoch " << epoch << ": " << reps.size() << " replicators" << std::endl;
         total_replicators += reps.size();
 
-        // Collect unique programs
+        // Collect unique programs and track first appearance
         for (const auto& rep : reps) {
             unique_programs.insert(rep.program);
+
+            // Record first appearance of this program
+            if (first_appearance.find(rep.program) == first_appearance.end()) {
+                first_appearance[rep.program] = rep;
+            }
         }
     }
 
     std::cout << "\nTotal replicators found: " << total_replicators << std::endl;
     std::cout << "Unique replicator programs: " << unique_programs.size() << std::endl;
+
+    std::cout << "\nUnique replicator programs:" << std::endl;
+    int prog_num = 1;
+    for (const auto& program : unique_programs) {
+        const auto& first = first_appearance[program];
+        std::cout << "  [" << prog_num++ << "] " << program << std::endl;
+        std::cout << "      First appeared at epoch " << first.epoch
+                  << ", position (" << first.grid_x << ", " << first.grid_y << ")" << std::endl;
+    }
 
     // Save results to file
     std::string output_path = pairings_dir + "/forward_pass_results.csv";
