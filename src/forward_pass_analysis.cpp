@@ -210,7 +210,7 @@ double calculate_similarity(const std::string& prog1, const std::string& prog2) 
 }
 
 // Find replicators using forward pass analysis with pairing data
-std::map<int, std::vector<ProgramLocation>> find_replicators(
+std::map<int, std::set<ProgramLocation>> find_replicators(
     const std::string& pairings_dir,
     int start_epoch,
     int grid_x,
@@ -236,8 +236,8 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
     // Cache for program execution results
     ProgramCache cache;
 
-    // Result storage: epoch -> vector of replicators (allows duplicates like Python)
-    std::map<int, std::vector<ProgramLocation>> replicators_by_epoch;
+    // Result storage: epoch -> set of replicators (using set to avoid duplicates)
+    std::map<int, std::set<ProgramLocation>> replicators_by_epoch;
 
     // Get initial program from pairing CSV
     std::stringstream csv_path;
@@ -272,7 +272,7 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
     initial.grid_x = grid_x;
     initial.grid_y = grid_y;
     initial.program = initial_program;
-    replicators_by_epoch[start_epoch].push_back(initial);
+    replicators_by_epoch[start_epoch].insert(initial);
 
     std::cout << std::endl;
 
@@ -396,7 +396,7 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
             // Skip if already in cache
             if (cache.has(candidate.program)) {
                 if (cache.is_replicator(candidate.program)) {
-                    replicators_by_epoch[epoch + 1].push_back(candidate);
+                    replicators_by_epoch[epoch + 1].insert(candidate);
                 }
                 continue;
             }
@@ -410,7 +410,7 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
                 cache.add(result.first.program, result.second);
                 if (result.second) {
                     std::lock_guard<std::mutex> lock(results_mutex);
-                    replicators_by_epoch[epoch + 1].push_back(result.first);
+                    replicators_by_epoch[epoch + 1].insert(result.first);
                 }
             }
 
@@ -426,7 +426,7 @@ std::map<int, std::vector<ProgramLocation>> find_replicators(
             auto result = future.get();
             cache.add(result.first.program, result.second);
             if (result.second) {
-                replicators_by_epoch[epoch + 1].push_back(result.first);
+                replicators_by_epoch[epoch + 1].insert(result.first);
             }
         }
 
