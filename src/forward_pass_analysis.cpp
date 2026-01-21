@@ -479,11 +479,20 @@ int main(int argc, char* argv[]) {
     // Print summary
     std::cout << "=== Summary ===" << std::endl;
     int total_replicators = 0;
+    std::set<std::string> unique_programs;
+
     for (const auto& [epoch, reps] : replicators) {
         std::cout << "Epoch " << epoch << ": " << reps.size() << " replicators" << std::endl;
         total_replicators += reps.size();
+
+        // Collect unique programs
+        for (const auto& rep : reps) {
+            unique_programs.insert(rep.program);
+        }
     }
+
     std::cout << "\nTotal replicators found: " << total_replicators << std::endl;
+    std::cout << "Unique replicator programs: " << unique_programs.size() << std::endl;
 
     // Save results to file
     std::string output_path = pairings_dir + "/forward_pass_results.csv";
