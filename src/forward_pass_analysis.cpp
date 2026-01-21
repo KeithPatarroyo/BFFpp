@@ -123,6 +123,23 @@ std::vector<std::string> parse_csv_line(const std::string& line) {
     return fields;
 }
 
+// Check if a character is a valid BF instruction
+bool is_valid_instruction(char ch) {
+    const std::string instructions = ",.[]{}<>+-";
+    return instructions.find(ch) != std::string::npos;
+}
+
+// Clean program by replacing non-instructions with spaces
+std::string clean_program(const std::string& program) {
+    std::string cleaned = program;
+    for (size_t i = 0; i < cleaned.size(); i++) {
+        if (!is_valid_instruction(cleaned[i])) {
+            cleaned[i] = ' ';
+        }
+    }
+    return cleaned;
+}
+
 // Read all cell data from a pairing CSV file
 std::map<std::pair<int, int>, CellData> read_pairing_csv(const std::string& csv_path) {
     std::map<std::pair<int, int>, CellData> cells;
@@ -143,7 +160,7 @@ std::map<std::pair<int, int>, CellData> read_pairing_csv(const std::string& csv_
 
         int x = std::stoi(fields[1]);
         int y = std::stoi(fields[2]);
-        std::string program = fields[3];
+        std::string program = clean_program(fields[3]);  // Clean program
         int combined_x = std::stoi(fields[4]);
         int combined_y = std::stoi(fields[5]);
 
