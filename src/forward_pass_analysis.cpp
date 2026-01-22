@@ -499,7 +499,23 @@ int main(int argc, char* argv[]) {
     std::set<std::string> unique_programs;
     std::map<std::string, ProgramLocation> first_appearance;
     std::map<std::string, int> program_to_label;  // Assign labels to unique programs
-    int next_label = 0;
+    int next_label_index = 0;
+
+    // Lambda to generate alternating labels: 0, 1, -1, 2, -2, 3, -3, ...
+    auto get_next_label = [&next_label_index]() -> int {
+        if (next_label_index == 0) {
+            next_label_index++;
+            return 0;
+        }
+        int label = (next_label_index + 1) / 2;
+        if (next_label_index % 2 == 1) {
+            next_label_index++;
+            return label;  // positive: 1, 2, 3, ...
+        } else {
+            next_label_index++;
+            return -label;  // negative: -1, -2, -3, ...
+        }
+    };
 
     // Structure to track evolutionary relationships
     struct EpochData {
@@ -518,7 +534,7 @@ int main(int argc, char* argv[]) {
 
             // Assign label to new unique programs
             if (program_to_label.find(rep.program) == program_to_label.end()) {
-                program_to_label[rep.program] = next_label++;
+                program_to_label[rep.program] = get_next_label();
             }
 
             // Record first appearance of this program
@@ -699,7 +715,9 @@ int main(int argc, char* argv[]) {
         }
 
         function scaleY(label) {
-            return padding + (maxLabel - label) / maxLabel * plotHeight;
+            const range = Math.max(Math.abs(Math.min(...allLabels)), Math.abs(Math.max(...allLabels)));
+            if (range === 0) return height / 2;  // Single label at center
+            return padding + plotHeight / 2 - (label / range) * (plotHeight / 2 - 20);
         }
 
         // Draw axes
