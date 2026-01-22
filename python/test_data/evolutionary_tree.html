@@ -160,16 +160,23 @@
         ctx.fillText('Replicator Label', 0, 0);
         ctx.restore();
 
-        // Draw epoch ticks
+        // Draw epoch ticks (only min and max)
         ctx.font = '12px Courier New';
-        for (let e of data.epochs) {
-            const x = scaleX(e.epoch);
-            ctx.fillText(e.epoch.toString(), x, height - padding + 20);
-        }
+        const x_min = scaleX(minEpoch);
+        const x_max = scaleX(maxEpoch);
+        ctx.fillText(minEpoch.toString(), x_min, height - padding + 20);
+        ctx.fillText(maxEpoch.toString(), x_max, height - padding + 20);
 
-        // Draw label ticks
+        // Draw label ticks (only min, 0, and max)
         ctx.textAlign = 'right';
-        for (let label of allLabels) {
+        const labelsToShow = [minLabel];
+        if (minLabel < 0 && maxLabel > 0) {
+            labelsToShow.push(0);  // Add 0 if it's in range
+        }
+        if (maxLabel !== minLabel) {
+            labelsToShow.push(maxLabel);
+        }
+        for (let label of labelsToShow) {
             const y = scaleY(label);
             ctx.fillText(label.toString(), padding - 10, y + 5);
         }
@@ -205,7 +212,7 @@
 
                 ctx.fillStyle = '#00ff00';
                 ctx.beginPath();
-                ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                ctx.arc(x, y, 3, 0, 2 * Math.PI);
                 ctx.fill();
 
                 ctx.strokeStyle = '#000';
