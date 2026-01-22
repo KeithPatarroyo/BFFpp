@@ -498,6 +498,15 @@ int main(int argc, char* argv[]) {
     int total_replicators = 0;
     std::set<std::string> unique_programs;
     std::map<std::string, ProgramLocation> first_appearance;
+    std::map<std::string, int> program_to_label;  // Assign labels to unique programs
+    int next_label = 0;
+
+    // Structure to track evolutionary relationships
+    struct EpochData {
+        std::set<int> labels_present;
+        std::set<std::pair<int, int>> edges;  // (parent_label, child_label)
+    };
+    std::map<int, EpochData> evolution_data;
 
     for (const auto& [epoch, reps] : replicators) {
         std::cout << "Epoch " << epoch << ": " << reps.size() << " replicators" << std::endl;
@@ -507,9 +516,49 @@ int main(int argc, char* argv[]) {
         for (const auto& rep : reps) {
             unique_programs.insert(rep.program);
 
+            // Assign label to new unique programs
+            if (program_to_label.find(rep.program) == program_to_label.end()) {
+                program_to_label[rep.program] = next_label++;
+            }
+
             // Record first appearance of this program
             if (first_appearance.find(rep.program) == first_appearance.end()) {
                 first_appearance[rep.program] = rep;
+            }
+
+            // Track which labels are present at this epoch
+            int label = program_to_label[rep.program];
+            evolution_data[epoch].labels_present.insert(label);
+        }
+    }
+
+    // Track parent-child relationships
+    // For each epoch, connect replicators at t to their parents at t-1
+    for (const auto& [epoch, reps] : replicators) {
+        if (epoch == start_epoch) continue;  // Skip first epoch (no parents)
+
+        const auto& prev_epoch_reps = replicators.at(epoch - 1);
+
+        for (const auto& rep : reps) {
+            int child_label = program_to_label[rep.program];
+
+            // Find which replicator(s) from previous epoch could be the parent
+            // A replicator at t-1 is a parent if it's in the neighborhood of this replicator at t
+            for (const auto& prev_rep : prev_epoch_reps) {
+                // Check if prev_rep is in the neighborhood of rep
+                // (within r=2 Von Neumann distance)
+                int dx = std::abs(rep.grid_x - prev_rep.grid_x);
+                int dy = std::abs(rep.grid_y - prev_rep.grid_y);
+                int manhattan = dx + dy;
+
+                // Also include corners
+                bool is_neighbor = (manhattan <= 2) ||
+                                   (dx == 1 && dy == 1);
+
+                if (is_neighbor || (rep.grid_x == prev_rep.grid_x && rep.grid_y == prev_rep.grid_y)) {
+                    int parent_label = program_to_label[prev_rep.program];
+                    evolution_data[epoch].edges.insert({parent_label, child_label});
+                }
             }
         }
     }
@@ -518,12 +567,219 @@ int main(int argc, char* argv[]) {
     std::cout << "Unique replicator programs: " << unique_programs.size() << std::endl;
 
     std::cout << "\nUnique replicator programs:" << std::endl;
-    int prog_num = 1;
     for (const auto& program : unique_programs) {
+        int label = program_to_label[program];
         const auto& first = first_appearance[program];
-        std::cout << "  [" << prog_num++ << "] " << program << std::endl;
+        std::cout << "  [" << label << "] " << program << std::endl;
         std::cout << "      First appeared at epoch " << first.epoch
                   << ", position (" << first.grid_x << ", " << first.grid_y << ")" << std::endl;
+    }
+
+    // Generate evolutionary tree visualization
+    std::cout << "\nGenerating evolutionary tree visualization..." << std::endl;
+
+    std::string viz_path = pairings_dir + "/evolutionary_tree.html";
+    std::ofstream viz_file(viz_path);
+    if (viz_file.is_open()) {
+        viz_file << R"(<!DOCTYPE html>
+<html>
+<head>
+    <title>Replicator Evolutionary Tree</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            margin: 20px;
+        }
+        #canvas {
+            background: #000;
+            border: 2px solid #00ff00;
+            display: block;
+            margin: 20px auto;
+        }
+        .info {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0a0a;
+            border: 1px solid #00ff00;
+        }
+        h1 {
+            color: #00ff00;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Replicator Evolutionary Tree</h1>
+    <canvas id="canvas"></canvas>
+    <div class="info">
+        <h2>Legend</h2>
+        <p>X-axis: Epoch (time)</p>
+        <p>Y-axis: Replicator Label (unique program ID)</p>
+        <p>Dots: Replicator present at that epoch</p>
+        <p>Lines: Evolutionary connections (parent → child)</p>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Data
+        const data = {
+)";
+
+        // Output epoch data as JSON
+        viz_file << "            epochs: [\n";
+        bool first_epoch = true;
+        for (const auto& [epoch, data] : evolution_data) {
+            if (!first_epoch) viz_file << ",\n";
+            first_epoch = false;
+
+            viz_file << "                {\n";
+            viz_file << "                    epoch: " << epoch << ",\n";
+            viz_file << "                    labels: [";
+            bool first_label = true;
+            for (int label : data.labels_present) {
+                if (!first_label) viz_file << ", ";
+                first_label = false;
+                viz_file << label;
+            }
+            viz_file << "],\n";
+            viz_file << "                    edges: [";
+            bool first_edge = true;
+            for (const auto& [parent, child] : data.edges) {
+                if (!first_edge) viz_file << ", ";
+                first_edge = false;
+                viz_file << "[" << parent << ", " << child << "]";
+            }
+            viz_file << "]\n";
+            viz_file << "                }";
+        }
+        viz_file << "\n            ],\n";
+
+        // Output program info
+        viz_file << "            programs: {\n";
+        bool first_prog = true;
+        for (const auto& [program, label] : program_to_label) {
+            if (!first_prog) viz_file << ",\n";
+            first_prog = false;
+
+            const auto& first = first_appearance[program];
+            viz_file << "                " << label << ": {\n";
+            viz_file << "                    program: \"" << program << "\",\n";
+            viz_file << "                    firstEpoch: " << first.epoch << ",\n";
+            viz_file << "                    firstPos: [" << first.grid_x << ", " << first.grid_y << "]\n";
+            viz_file << "                }";
+        }
+        viz_file << "\n            }\n";
+        viz_file << "        };\n\n";
+
+        viz_file << R"(
+        // Drawing parameters
+        const width = 1200;
+        const height = 800;
+        canvas.width = width;
+        canvas.height = height;
+
+        const padding = 60;
+        const plotWidth = width - 2 * padding;
+        const plotHeight = height - 2 * padding;
+
+        // Find ranges
+        const minEpoch = Math.min(...data.epochs.map(e => e.epoch));
+        const maxEpoch = Math.max(...data.epochs.map(e => e.epoch));
+        const allLabels = new Set();
+        data.epochs.forEach(e => e.labels.forEach(l => allLabels.add(l)));
+        const maxLabel = Math.max(...allLabels);
+
+        // Scale functions
+        function scaleX(epoch) {
+            return padding + (epoch - minEpoch) / (maxEpoch - minEpoch) * plotWidth;
+        }
+
+        function scaleY(label) {
+            return padding + (maxLabel - label) / maxLabel * plotHeight;
+        }
+
+        // Draw axes
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding, padding);
+        ctx.lineTo(padding, height - padding);
+        ctx.lineTo(width - padding, height - padding);
+        ctx.stroke();
+
+        // Draw axis labels
+        ctx.fillStyle = '#00ff00';
+        ctx.font = '14px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('Epoch', width / 2, height - 20);
+        ctx.save();
+        ctx.translate(20, height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Replicator Label', 0, 0);
+        ctx.restore();
+
+        // Draw epoch ticks
+        ctx.font = '12px Courier New';
+        for (let e of data.epochs) {
+            const x = scaleX(e.epoch);
+            ctx.fillText(e.epoch.toString(), x, height - padding + 20);
+        }
+
+        // Draw label ticks
+        ctx.textAlign = 'right';
+        for (let label of allLabels) {
+            const y = scaleY(label);
+            ctx.fillText(label.toString(), padding - 10, y + 5);
+        }
+
+        // Draw edges
+        ctx.strokeStyle = '#00aa00';
+        ctx.lineWidth = 1;
+        for (let i = 1; i < data.epochs.length; i++) {
+            const epochData = data.epochs[i];
+            const prevEpochData = data.epochs[i - 1];
+
+            for (let [parent, child] of epochData.edges) {
+                const x1 = scaleX(prevEpochData.epoch);
+                const y1 = scaleY(parent);
+                const x2 = scaleX(epochData.epoch);
+                const y2 = scaleY(child);
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+        }
+
+        // Draw points
+        for (let epochData of data.epochs) {
+            for (let label of epochData.labels) {
+                const x = scaleX(epochData.epoch);
+                const y = scaleY(label);
+
+                ctx.fillStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        console.log('Evolutionary tree drawn successfully');
+    </script>
+</body>
+</html>
+)";
+        viz_file.close();
+        std::cout << "Evolutionary tree saved to: " << viz_path << std::endl;
     }
 
     // Save results to file

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Replicator Evolutionary Tree</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            margin: 20px;
+        }
+        #canvas {
+            background: #000;
+            border: 2px solid #00ff00;
+            display: block;
+            margin: 20px auto;
+        }
+        .info {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0a0a;
+            border: 1px solid #00ff00;
+        }
+        h1 {
+            color: #00ff00;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Replicator Evolutionary Tree</h1>
+    <canvas id="canvas"></canvas>
+    <div class="info">
+        <h2>Legend</h2>
+        <p>X-axis: Epoch (time)</p>
+        <p>Y-axis: Replicator Label (unique program ID)</p>
+        <p>Dots: Replicator present at that epoch</p>
+        <p>Lines: Evolutionary connections (parent → child)</p>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Data
+        const data = {
+            epochs: [
+                {
+                    epoch: 16324,
+                    labels: [0],
+                    edges: []
+                },
+                {
+                    epoch: 16325,
+                    labels: [0],
+                    edges: [[0, 0]]
+                },
+                {
+                    epoch: 16326,
+                    labels: [0],
+                    edges: [[0, 0]]
+                },
+                {
+                    epoch: 16327,
+                    labels: [0],
+                    edges: [[0, 0]]
+                },
+                {
+                    epoch: 16328,
+                    labels: [0],
+                    edges: [[0, 0]]
+                },
+                {
+                    epoch: 16329,
+                    labels: [0],
+                    edges: [[0, 0]]
+                },
+                {
+                    epoch: 16330,
+                    labels: [0],
+                    edges: [[0, 0]]
+                },
+                {
+                    epoch: 16331,
+                    labels: [0],
+                    edges: [[0, 0]]
+                },
+                {
+                    epoch: 16332,
+                    labels: [0],
+                    edges: [[0, 0]]
+                },
+                {
+                    epoch: 16333,
+                    labels: [0],
+                    edges: [[0, 0]]
+                }
+            ],
+            programs: {
+                0: {
+                    program: "[.    < {                     ,]",
+                    firstEpoch: 16324,
+                    firstPos: [14, 27]
+                }
+            }
+        };
+
+
+        // Drawing parameters
+        const width = 1200;
+        const height = 800;
+        canvas.width = width;
+        canvas.height = height;
+
+        const padding = 60;
+        const plotWidth = width - 2 * padding;
+        const plotHeight = height - 2 * padding;
+
+        // Find ranges
+        const minEpoch = Math.min(...data.epochs.map(e => e.epoch));
+        const maxEpoch = Math.max(...data.epochs.map(e => e.epoch));
+        const allLabels = new Set();
+        data.epochs.forEach(e => e.labels.forEach(l => allLabels.add(l)));
+        const maxLabel = Math.max(...allLabels);
+
+        // Scale functions
+        function scaleX(epoch) {
+            return padding + (epoch - minEpoch) / (maxEpoch - minEpoch) * plotWidth;
+        }
+
+        function scaleY(label) {
+            return padding + (maxLabel - label) / maxLabel * plotHeight;
+        }
+
+        // Draw axes
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding, padding);
+        ctx.lineTo(padding, height - padding);
+        ctx.lineTo(width - padding, height - padding);
+        ctx.stroke();
+
+        // Draw axis labels
+        ctx.fillStyle = '#00ff00';
+        ctx.font = '14px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('Epoch', width / 2, height - 20);
+        ctx.save();
+        ctx.translate(20, height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Replicator Label', 0, 0);
+        ctx.restore();
+
+        // Draw epoch ticks
+        ctx.font = '12px Courier New';
+        for (let e of data.epochs) {
+            const x = scaleX(e.epoch);
+            ctx.fillText(e.epoch.toString(), x, height - padding + 20);
+        }
+
+        // Draw label ticks
+        ctx.textAlign = 'right';
+        for (let label of allLabels) {
+            const y = scaleY(label);
+            ctx.fillText(label.toString(), padding - 10, y + 5);
+        }
+
+        // Draw edges
+        ctx.strokeStyle = '#00aa00';
+        ctx.lineWidth = 1;
+        for (let i = 1; i < data.epochs.length; i++) {
+            const epochData = data.epochs[i];
+            const prevEpochData = data.epochs[i - 1];
+
+            for (let [parent, child] of epochData.edges) {
+                const x1 = scaleX(prevEpochData.epoch);
+                const y1 = scaleY(parent);
+                const x2 = scaleX(epochData.epoch);
+                const y2 = scaleY(child);
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+        }
+
+        // Draw points
+        for (let epochData of data.epochs) {
+            for (let label of epochData.labels) {
+                const x = scaleX(epochData.epoch);
+                const y = scaleY(label);
+
+                ctx.fillStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        console.log('Evolutionary tree drawn successfully');
+    </script>
+</body>
+</html>
