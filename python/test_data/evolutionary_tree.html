@@ -129,7 +129,9 @@
         }
 
         function scaleY(label) {
-            return padding + (maxLabel - label) / maxLabel * plotHeight;
+            const range = Math.max(Math.abs(Math.min(...allLabels)), Math.abs(Math.max(...allLabels)));
+            if (range === 0) return height / 2;  // Single label at center
+            return padding + plotHeight / 2 - (label / range) * (plotHeight / 2 - 20);
         }
 
         // Draw axes
