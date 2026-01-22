@@ -682,7 +682,7 @@ int main(int argc, char* argv[]) {
             first_prog = false;
 
             const auto& first = first_appearance[program];
-            viz_file << "                " << label << ": {\n";
+            viz_file << "                \"" << label << "\": {\n";
             viz_file << "                    program: \"" << program << "\",\n";
             viz_file << "                    firstEpoch: " << first.epoch << ",\n";
             viz_file << "                    firstPos: [" << first.grid_x << ", " << first.grid_y << "]\n";
