@@ -682,7 +682,7 @@ int main(int argc, char* argv[]) {
             first_prog = false;
 
             const auto& first = first_appearance[program];
-            viz_file << "                " << label << ": {\n";
+            viz_file << "                \"" << label << "\": {\n";
             viz_file << "                    program: \"" << program << "\",\n";
             viz_file << "                    firstEpoch: " << first.epoch << ",\n";
             viz_file << "                    firstPos: [" << first.grid_x << ", " << first.grid_y << "]\n";
@@ -708,14 +708,20 @@ int main(int argc, char* argv[]) {
         const allLabels = new Set();
         data.epochs.forEach(e => e.labels.forEach(l => allLabels.add(l)));
         const maxLabel = Math.max(...allLabels);
+        const minLabel = Math.min(...allLabels);
+
+        console.log('Epochs:', minEpoch, 'to', maxEpoch);
+        console.log('Labels:', Array.from(allLabels));
+        console.log('Canvas size:', width, 'x', height);
 
         // Scale functions
         function scaleX(epoch) {
+            if (maxEpoch === minEpoch) return width / 2;
             return padding + (epoch - minEpoch) / (maxEpoch - minEpoch) * plotWidth;
         }
 
         function scaleY(label) {
-            const range = Math.max(Math.abs(Math.min(...allLabels)), Math.abs(Math.max(...allLabels)));
+            const range = Math.max(Math.abs(minLabel), Math.abs(maxLabel));
             if (range === 0) return height / 2;  // Single label at center
             return padding + plotHeight / 2 - (label / range) * (plotHeight / 2 - 20);
         }
@@ -775,10 +781,13 @@ int main(int argc, char* argv[]) {
         }
 
         // Draw points
+        let pointsDrawn = 0;
         for (let epochData of data.epochs) {
             for (let label of epochData.labels) {
                 const x = scaleX(epochData.epoch);
                 const y = scaleY(label);
+
+                console.log('Drawing point at epoch', epochData.epoch, 'label', label, '-> (', x, ',', y, ')');
 
                 ctx.fillStyle = '#00ff00';
                 ctx.beginPath();
@@ -788,10 +797,11 @@ int main(int argc, char* argv[]) {
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 1;
                 ctx.stroke();
+                pointsDrawn++;
             }
         }
 
-        console.log('Evolutionary tree drawn successfully');
+        console.log('Evolutionary tree drawn successfully. Points:', pointsDrawn);
     </script>
 </body>
 </html>
