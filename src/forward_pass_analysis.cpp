@@ -1,5 +1,6 @@
 #include "emulator.h"
 #include "utils.h"
+#include "metrics.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -592,13 +593,55 @@ int main(int argc, char* argv[]) {
     std::cout << "\nTotal replicators found: " << total_replicators << std::endl;
     std::cout << "Unique replicator programs: " << unique_programs.size() << std::endl;
 
+    // Calculate compression distances for each unique replicator
+    std::cout << "\nCalculating compression distances..." << std::endl;
+    std::map<std::string, double> compression_distances;
+
+    // Get the first replicator program
+    std::string first_replicator;
+    if (!unique_programs.empty()) {
+        first_replicator = *unique_programs.begin();
+
+        // Convert to vector<uint8_t> for compression
+        std::vector<uint8_t> rep_x(first_replicator.begin(), first_replicator.end());
+        double C_rep_x = kolmogorov_complexity_estimate(rep_x);
+
+        // First replicator has distance 0
+        compression_distances[first_replicator] = 0.0;
+
+        // Calculate distance for all other unique replicators
+        for (const auto& program : unique_programs) {
+            if (program == first_replicator) continue;
+
+            std::vector<uint8_t> rep_y(program.begin(), program.end());
+            double C_rep_y = kolmogorov_complexity_estimate(rep_y);
+
+            // Concatenate rep_x and rep_y
+            std::vector<uint8_t> concatenated = rep_x;
+            concatenated.insert(concatenated.end(), rep_y.begin(), rep_y.end());
+            double C_concat = kolmogorov_complexity_estimate(concatenated);
+
+            // Calculate compression distance
+            double min_C = std::min(C_rep_x, C_rep_y);
+            double max_C = std::max(C_rep_x, C_rep_y);
+
+            if (max_C > 0) {
+                compression_distances[program] = (C_concat - min_C) / max_C;
+            } else {
+                compression_distances[program] = 0.0;
+            }
+        }
+    }
+
     std::cout << "\nUnique replicator programs:" << std::endl;
     for (const auto& program : unique_programs) {
         int label = program_to_label[program];
+        double distance = compression_distances[program];
         const auto& first = first_appearance[program];
         std::cout << "  [" << label << "] " << program << std::endl;
         std::cout << "      First appeared at epoch " << first.epoch
                   << ", position (" << first.grid_x << ", " << first.grid_y << ")" << std::endl;
+        std::cout << "      Compression distance: " << std::fixed << std::setprecision(4) << distance << std::endl;
     }
 
     // Generate evolutionary tree visualization
@@ -829,6 +872,266 @@ int main(int argc, char* argv[]) {
 )";
         viz_file.close();
         std::cout << "Evolutionary tree saved to: " << viz_path << std::endl;
+    }
+
+    // Generate compression distance plot
+    std::cout << "Generating compression distance plot..." << std::endl;
+
+    std::string dist_viz_path = pairings_dir + "/compression_distance_tree.html";
+    std::ofstream dist_viz_file(dist_viz_path);
+    if (dist_viz_file.is_open()) {
+        dist_viz_file << R"(<!DOCTYPE html>
+<html>
+<head>
+    <title>Replicator Compression Distance Tree</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            margin: 20px;
+        }
+        #canvas {
+            background: #000;
+            border: 2px solid #00ff00;
+            display: block;
+            margin: 20px auto;
+        }
+        .info {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0a0a;
+            border: 1px solid #00ff00;
+        }
+        h1 {
+            color: #00ff00;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Replicator Compression Distance Tree</h1>
+    <canvas id="canvas"></canvas>
+    <div class="info">
+        <h2>Legend</h2>
+        <p>X-axis: Epoch (time)</p>
+        <p>Y-axis: Compression Distance from first replicator</p>
+        <p>Dots: Replicator present at that epoch</p>
+        <p>Lines: Evolutionary connections (parent → child)</p>
+        <p>Distance formula: (C(xy) - min(C(x),C(y))) / max(C(x),C(y))</p>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Data
+        const data = {
+)";
+
+        // Output epoch data with compression distances
+        dist_viz_file << "            epochs: [\n";
+        bool first_epoch_dist = true;
+        for (const auto& [epoch, reps] : replicators) {
+            if (!first_epoch_dist) dist_viz_file << ",\n";
+            first_epoch_dist = false;
+
+            std::set<double> distances_at_epoch;
+            std::set<std::pair<double, double>> edges_with_distances;
+
+            // Collect distances for this epoch
+            for (const auto& rep : reps) {
+                double distance = compression_distances[rep.program];
+                distances_at_epoch.insert(distance);
+            }
+
+            // Calculate edges using compression distances
+            if (epoch != start_epoch) {
+                const auto& prev_epoch_reps = replicators.at(epoch - 1);
+                for (const auto& rep : reps) {
+                    double child_distance = compression_distances[rep.program];
+
+                    for (const auto& prev_rep : prev_epoch_reps) {
+                        int dx = std::abs(rep.grid_x - prev_rep.grid_x);
+                        int dy = std::abs(rep.grid_y - prev_rep.grid_y);
+                        int manhattan = dx + dy;
+                        bool is_neighbor = (manhattan <= 2) || (dx == 1 && dy == 1);
+
+                        if (is_neighbor || (rep.grid_x == prev_rep.grid_x && rep.grid_y == prev_rep.grid_y)) {
+                            double parent_distance = compression_distances[prev_rep.program];
+                            edges_with_distances.insert({parent_distance, child_distance});
+                        }
+                    }
+                }
+            }
+
+            dist_viz_file << "                {\n";
+            dist_viz_file << "                    epoch: " << epoch << ",\n";
+            dist_viz_file << "                    distances: [";
+            bool first_dist = true;
+            for (double dist : distances_at_epoch) {
+                if (!first_dist) dist_viz_file << ", ";
+                first_dist = false;
+                dist_viz_file << std::fixed << std::setprecision(6) << dist;
+            }
+            dist_viz_file << "],\n";
+            dist_viz_file << "                    edges: [";
+            bool first_edge_dist = true;
+            for (const auto& [parent_dist, child_dist] : edges_with_distances) {
+                if (!first_edge_dist) dist_viz_file << ", ";
+                first_edge_dist = false;
+                dist_viz_file << "[" << std::fixed << std::setprecision(6) << parent_dist << ", " << child_dist << "]";
+            }
+            dist_viz_file << "]\n";
+            dist_viz_file << "                }";
+        }
+        dist_viz_file << "\n            ],\n";
+
+        // Output program info with distances
+        dist_viz_file << "            programs: {\n";
+        bool first_prog_dist = true;
+        for (const auto& [program, label] : program_to_label) {
+            if (!first_prog_dist) dist_viz_file << ",\n";
+            first_prog_dist = false;
+
+            const auto& first = first_appearance[program];
+            double distance = compression_distances[program];
+            dist_viz_file << "                \"" << label << "\": {\n";
+            dist_viz_file << "                    program: \"" << program << "\",\n";
+            dist_viz_file << "                    distance: " << std::fixed << std::setprecision(6) << distance << ",\n";
+            dist_viz_file << "                    firstEpoch: " << first.epoch << ",\n";
+            dist_viz_file << "                    firstPos: [" << first.grid_x << ", " << first.grid_y << "]\n";
+            dist_viz_file << "                }";
+        }
+        dist_viz_file << "\n            }\n";
+        dist_viz_file << "        };\n\n";
+
+        // Output visualization parameters
+        dist_viz_file << "        const dotRadius = " << dot_radius << ";\n";
+        dist_viz_file << "        const lineWidth = " << line_width << ";\n\n";
+
+        dist_viz_file << R"(
+        // Drawing parameters
+        const width = 1200;
+        const height = 800;
+        canvas.width = width;
+        canvas.height = height;
+
+        const padding = 60;
+        const plotWidth = width - 2 * padding;
+        const plotHeight = height - 2 * padding;
+
+        // Find ranges
+        const minEpoch = Math.min(...data.epochs.map(e => e.epoch));
+        const maxEpoch = Math.max(...data.epochs.map(e => e.epoch));
+        const allDistances = new Set();
+        data.epochs.forEach(e => e.distances.forEach(d => allDistances.add(d)));
+        const maxDistance = Math.max(...allDistances);
+        const minDistance = Math.min(...allDistances);
+
+        console.log('Epochs:', minEpoch, 'to', maxEpoch);
+        console.log('Distances:', Array.from(allDistances));
+        console.log('Canvas size:', width, 'x', height);
+
+        // Scale functions
+        function scaleX(epoch) {
+            if (maxEpoch === minEpoch) return width / 2;
+            return padding + (epoch - minEpoch) / (maxEpoch - minEpoch) * plotWidth;
+        }
+
+        function scaleY(distance) {
+            const range = maxDistance - minDistance;
+            if (range === 0) return height / 2;
+            return padding + plotHeight - ((distance - minDistance) / range) * plotHeight;
+        }
+
+        // Draw axes
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding, padding);
+        ctx.lineTo(padding, height - padding);
+        ctx.lineTo(width - padding, height - padding);
+        ctx.stroke();
+
+        // Draw axis labels
+        ctx.fillStyle = '#00ff00';
+        ctx.font = '14px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('Epoch', width / 2, height - 20);
+        ctx.save();
+        ctx.translate(20, height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Compression Distance', 0, 0);
+        ctx.restore();
+
+        // Draw epoch ticks (only min and max)
+        ctx.font = '12px Courier New';
+        const x_min = scaleX(minEpoch);
+        const x_max = scaleX(maxEpoch);
+        ctx.fillText(minEpoch.toString(), x_min, height - padding + 20);
+        ctx.fillText(maxEpoch.toString(), x_max, height - padding + 20);
+
+        // Draw distance ticks (min, mid, max)
+        ctx.textAlign = 'right';
+        const distancesToShow = [minDistance];
+        if (maxDistance !== minDistance) {
+            distancesToShow.push((minDistance + maxDistance) / 2);
+            distancesToShow.push(maxDistance);
+        }
+        for (let distance of distancesToShow) {
+            const y = scaleY(distance);
+            ctx.fillText(distance.toFixed(3), padding - 10, y + 5);
+        }
+
+        // Draw edges
+        ctx.strokeStyle = '#00aa00';
+        ctx.lineWidth = lineWidth;
+        for (let i = 1; i < data.epochs.length; i++) {
+            const epochData = data.epochs[i];
+            const prevEpochData = data.epochs[i - 1];
+
+            for (let [parentDist, childDist] of epochData.edges) {
+                const x1 = scaleX(prevEpochData.epoch);
+                const y1 = scaleY(parentDist);
+                const x2 = scaleX(epochData.epoch);
+                const y2 = scaleY(childDist);
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+        }
+
+        // Draw points
+        let pointsDrawn = 0;
+        for (let epochData of data.epochs) {
+            for (let distance of epochData.distances) {
+                const x = scaleX(epochData.epoch);
+                const y = scaleY(distance);
+
+                console.log('Drawing point at epoch', epochData.epoch, 'distance', distance, '-> (', x, ',', y, ')');
+
+                ctx.fillStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.arc(x, y, dotRadius, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                pointsDrawn++;
+            }
+        }
+
+        console.log('Compression distance tree drawn successfully. Points:', pointsDrawn);
+    </script>
+</body>
+</html>
+)";
+        dist_viz_file.close();
+        std::cout << "Compression distance tree saved to: " << dist_viz_path << std::endl;
     }
 
     // Save results to file

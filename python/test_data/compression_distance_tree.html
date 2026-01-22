@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Replicator Compression Distance Tree</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            margin: 20px;
+        }
+        #canvas {
+            background: #000;
+            border: 2px solid #00ff00;
+            display: block;
+            margin: 20px auto;
+        }
+        .info {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #0a0a0a;
+            border: 1px solid #00ff00;
+        }
+        h1 {
+            color: #00ff00;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Replicator Compression Distance Tree</h1>
+    <canvas id="canvas"></canvas>
+    <div class="info">
+        <h2>Legend</h2>
+        <p>X-axis: Epoch (time)</p>
+        <p>Y-axis: Compression Distance from first replicator</p>
+        <p>Dots: Replicator present at that epoch</p>
+        <p>Lines: Evolutionary connections (parent → child)</p>
+        <p>Distance formula: (C(xy) - min(C(x),C(y))) / max(C(x),C(y))</p>
+    </div>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Data
+        const data = {
+            epochs: [
+                {
+                    epoch: 16324,
+                    distances: [0.000000],
+                    edges: []
+                },
+                {
+                    epoch: 16325,
+                    distances: [0.000000],
+                    edges: [[0.000000, 0.000000]]
+                },
+                {
+                    epoch: 16326,
+                    distances: [0.000000],
+                    edges: [[0.000000, 0.000000]]
+                },
+                {
+                    epoch: 16327,
+                    distances: [0.000000],
+                    edges: [[0.000000, 0.000000]]
+                },
+                {
+                    epoch: 16328,
+                    distances: [0.000000],
+                    edges: [[0.000000, 0.000000]]
+                },
+                {
+                    epoch: 16329,
+                    distances: [0.000000],
+                    edges: [[0.000000, 0.000000]]
+                },
+                {
+                    epoch: 16330,
+                    distances: [0.000000],
+                    edges: [[0.000000, 0.000000]]
+                },
+                {
+                    epoch: 16331,
+                    distances: [0.000000],
+                    edges: [[0.000000, 0.000000]]
+                },
+                {
+                    epoch: 16332,
+                    distances: [0.000000],
+                    edges: [[0.000000, 0.000000]]
+                },
+                {
+                    epoch: 16333,
+                    distances: [0.000000],
+                    edges: [[0.000000, 0.000000]]
+                }
+            ],
+            programs: {
+                "0": {
+                    program: "[.    < {                     ,]",
+                    distance: 0.000000,
+                    firstEpoch: 16324,
+                    firstPos: [14, 27]
+                }
+            }
+        };
+
+        const dotRadius = 3.000000;
+        const lineWidth = 1.000000;
+
+
+        // Drawing parameters
+        const width = 1200;
+        const height = 800;
+        canvas.width = width;
+        canvas.height = height;
+
+        const padding = 60;
+        const plotWidth = width - 2 * padding;
+        const plotHeight = height - 2 * padding;
+
+        // Find ranges
+        const minEpoch = Math.min(...data.epochs.map(e => e.epoch));
+        const maxEpoch = Math.max(...data.epochs.map(e => e.epoch));
+        const allDistances = new Set();
+        data.epochs.forEach(e => e.distances.forEach(d => allDistances.add(d)));
+        const maxDistance = Math.max(...allDistances);
+        const minDistance = Math.min(...allDistances);
+
+        console.log('Epochs:', minEpoch, 'to', maxEpoch);
+        console.log('Distances:', Array.from(allDistances));
+        console.log('Canvas size:', width, 'x', height);
+
+        // Scale functions
+        function scaleX(epoch) {
+            if (maxEpoch === minEpoch) return width / 2;
+            return padding + (epoch - minEpoch) / (maxEpoch - minEpoch) * plotWidth;
+        }
+
+        function scaleY(distance) {
+            const range = maxDistance - minDistance;
+            if (range === 0) return height / 2;
+            return padding + plotHeight - ((distance - minDistance) / range) * plotHeight;
+        }
+
+        // Draw axes
+        ctx.strokeStyle = '#00ff00';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padding, padding);
+        ctx.lineTo(padding, height - padding);
+        ctx.lineTo(width - padding, height - padding);
+        ctx.stroke();
+
+        // Draw axis labels
+        ctx.fillStyle = '#00ff00';
+        ctx.font = '14px Courier New';
+        ctx.textAlign = 'center';
+        ctx.fillText('Epoch', width / 2, height - 20);
+        ctx.save();
+        ctx.translate(20, height / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText('Compression Distance', 0, 0);
+        ctx.restore();
+
+        // Draw epoch ticks (only min and max)
+        ctx.font = '12px Courier New';
+        const x_min = scaleX(minEpoch);
+        const x_max = scaleX(maxEpoch);
+        ctx.fillText(minEpoch.toString(), x_min, height - padding + 20);
+        ctx.fillText(maxEpoch.toString(), x_max, height - padding + 20);
+
+        // Draw distance ticks (min, mid, max)
+        ctx.textAlign = 'right';
+        const distancesToShow = [minDistance];
+        if (maxDistance !== minDistance) {
+            distancesToShow.push((minDistance + maxDistance) / 2);
+            distancesToShow.push(maxDistance);
+        }
+        for (let distance of distancesToShow) {
+            const y = scaleY(distance);
+            ctx.fillText(distance.toFixed(3), padding - 10, y + 5);
+        }
+
+        // Draw edges
+        ctx.strokeStyle = '#00aa00';
+        ctx.lineWidth = lineWidth;
+        for (let i = 1; i < data.epochs.length; i++) {
+            const epochData = data.epochs[i];
+            const prevEpochData = data.epochs[i - 1];
+
+            for (let [parentDist, childDist] of epochData.edges) {
+                const x1 = scaleX(prevEpochData.epoch);
+                const y1 = scaleY(parentDist);
+                const x2 = scaleX(epochData.epoch);
+                const y2 = scaleY(childDist);
+
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            }
+        }
+
+        // Draw points
+        let pointsDrawn = 0;
+        for (let epochData of data.epochs) {
+            for (let distance of epochData.distances) {
+                const x = scaleX(epochData.epoch);
+                const y = scaleY(distance);
+
+                console.log('Drawing point at epoch', epochData.epoch, 'distance', distance, '-> (', x, ',', y, ')');
+
+                ctx.fillStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.arc(x, y, dotRadius, 0, 2 * Math.PI);
+                ctx.fill();
+
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                pointsDrawn++;
+            }
+        }
+
+        console.log('Compression distance tree drawn successfully. Points:', pointsDrawn);
+    </script>
+</body>
+</html>
