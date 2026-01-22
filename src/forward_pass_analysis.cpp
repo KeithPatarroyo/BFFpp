@@ -597,21 +597,26 @@ int main(int argc, char* argv[]) {
     std::cout << "\nCalculating compression distances..." << std::endl;
     std::map<std::string, double> compression_distances;
 
-    // Get the first replicator program
-    std::string first_replicator;
-    if (!unique_programs.empty()) {
-        first_replicator = *unique_programs.begin();
+    // Find the replicator with label 0 (the first discovered replicator)
+    std::string reference_replicator;
+    for (const auto& [program, label] : program_to_label) {
+        if (label == 0) {
+            reference_replicator = program;
+            break;
+        }
+    }
 
+    if (!reference_replicator.empty()) {
         // Convert to vector<uint8_t> for compression
-        std::vector<uint8_t> rep_x(first_replicator.begin(), first_replicator.end());
+        std::vector<uint8_t> rep_x(reference_replicator.begin(), reference_replicator.end());
         double C_rep_x = kolmogorov_complexity_estimate(rep_x);
 
-        // First replicator has distance 0
-        compression_distances[first_replicator] = 0.0;
+        // Reference replicator (label 0) has distance 0
+        compression_distances[reference_replicator] = 0.0;
 
         // Calculate distance for all other unique replicators
         for (const auto& program : unique_programs) {
-            if (program == first_replicator) continue;
+            if (program == reference_replicator) continue;
 
             std::vector<uint8_t> rep_y(program.begin(), program.end());
             double C_rep_y = kolmogorov_complexity_estimate(rep_y);
