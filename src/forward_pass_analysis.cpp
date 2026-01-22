@@ -460,10 +460,10 @@ int main(int argc, char* argv[]) {
     // Parse command line arguments
     if (argc < 8) {
         std::cerr << "Usage: " << argv[0]
-                  << " <pairings_dir> <start_epoch> <grid_x> <grid_y> <last_epoch> <grid_width> <grid_height> [num_threads]"
+                  << " <pairings_dir> <start_epoch> <grid_x> <grid_y> <last_epoch> <grid_width> <grid_height> [num_threads] [dot_radius] [line_width]"
                   << std::endl;
         std::cerr << "Example: " << argv[0]
-                  << " python/test_data 16324 14 27 16327 64 64 8"
+                  << " python/test_data 16324 14 27 16327 64 64 8 3 1"
                   << std::endl;
         return 1;
     }
@@ -479,6 +479,16 @@ int main(int argc, char* argv[]) {
     unsigned int num_threads = 0;
     if (argc > 8) {
         num_threads = std::atoi(argv[8]);
+    }
+
+    double dot_radius = 3.0;
+    if (argc > 9) {
+        dot_radius = std::atof(argv[9]);
+    }
+
+    double line_width = 1.0;
+    if (argc > 10) {
+        line_width = std::atof(argv[10]);
     }
 
     // Run forward pass analysis
@@ -691,6 +701,10 @@ int main(int argc, char* argv[]) {
         viz_file << "\n            }\n";
         viz_file << "        };\n\n";
 
+        // Output visualization parameters
+        viz_file << "        const dotRadius = " << dot_radius << ";\n";
+        viz_file << "        const lineWidth = " << line_width << ";\n\n";
+
         viz_file << R"(
         // Drawing parameters
         const width = 1200;
@@ -769,7 +783,7 @@ int main(int argc, char* argv[]) {
 
         // Draw edges
         ctx.strokeStyle = '#00aa00';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = lineWidth;
         for (let i = 1; i < data.epochs.length; i++) {
             const epochData = data.epochs[i];
             const prevEpochData = data.epochs[i - 1];
@@ -798,7 +812,7 @@ int main(int argc, char* argv[]) {
 
                 ctx.fillStyle = '#00ff00';
                 ctx.beginPath();
-                ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                ctx.arc(x, y, dotRadius, 0, 2 * Math.PI);
                 ctx.fill();
 
                 ctx.strokeStyle = '#000';
