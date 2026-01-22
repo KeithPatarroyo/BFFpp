@@ -609,7 +609,7 @@ int main(int argc, char* argv[]) {
     if (!reference_replicator.empty()) {
         // Convert to vector<uint8_t> for compression
         std::vector<uint8_t> rep_x(reference_replicator.begin(), reference_replicator.end());
-        double C_rep_x = kolmogorov_complexity_estimate(rep_x);
+        double C_rep_x = compressed_size(rep_x);
 
         // Reference replicator (label 0) has distance 0
         compression_distances[reference_replicator] = 0.0;
@@ -619,12 +619,12 @@ int main(int argc, char* argv[]) {
             if (program == reference_replicator) continue;
 
             std::vector<uint8_t> rep_y(program.begin(), program.end());
-            double C_rep_y = kolmogorov_complexity_estimate(rep_y);
+            double C_rep_y = compressed_size(rep_y);
 
             // Concatenate rep_x and rep_y
             std::vector<uint8_t> concatenated = rep_x;
             concatenated.insert(concatenated.end(), rep_y.begin(), rep_y.end());
-            double C_concat = kolmogorov_complexity_estimate(concatenated);
+            double C_concat = compressed_size(concatenated);
 
             // Calculate compression distance
             double min_C = std::min(C_rep_x, C_rep_y);

@@ -52,6 +52,30 @@ double kolmogorov_complexity_estimate(const std::vector<uint8_t>& byte_string) {
     return (static_cast<double>(compressed_size) / input_size) * 8.0;
 }
 
+double compressed_size(const std::vector<uint8_t>& byte_string) {
+    size_t input_size = byte_string.size();
+    size_t max_compressed_size = BrotliEncoderMaxCompressedSize(input_size);
+    std::vector<uint8_t> compressed(max_compressed_size);
+
+    size_t comp_size = max_compressed_size;
+    int result = BrotliEncoderCompress(
+        BROTLI_DEFAULT_QUALITY,
+        BROTLI_DEFAULT_WINDOW,
+        BROTLI_DEFAULT_MODE,
+        input_size,
+        byte_string.data(),
+        &comp_size,
+        compressed.data()
+    );
+
+    if (result == BROTLI_FALSE) {
+        // Compression failed, return input size
+        return static_cast<double>(input_size);
+    }
+
+    return static_cast<double>(comp_size);
+}
+
 double higher_order_entropy(const std::vector<uint8_t>& byte_string) {
     return shannon_entropy(byte_string) - kolmogorov_complexity_estimate(byte_string);
 }
