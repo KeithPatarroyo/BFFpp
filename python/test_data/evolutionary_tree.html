@@ -105,6 +105,9 @@
             }
         };
 
+        const dotRadius = 3;
+        const lineWidth = 1;
+
 
         // Drawing parameters
         const width = 1200;
@@ -183,7 +186,7 @@
 
         // Draw edges
         ctx.strokeStyle = '#00aa00';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = lineWidth;
         for (let i = 1; i < data.epochs.length; i++) {
             const epochData = data.epochs[i];
             const prevEpochData = data.epochs[i - 1];
@@ -212,7 +215,7 @@
 
                 ctx.fillStyle = '#00ff00';
                 ctx.beginPath();
-                ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                ctx.arc(x, y, dotRadius, 0, 2 * Math.PI);
                 ctx.fill();
 
                 ctx.strokeStyle = '#000';
