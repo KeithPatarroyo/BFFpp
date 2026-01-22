@@ -7,12 +7,19 @@
 
 #include <iostream>
 #include <vector>
+#include <map>
 #include <random>
 #include <algorithm>
 #include <thread>
 #include <iomanip>
 #include <sstream>
 #include <fstream>
+
+// Check if a character is a valid BF instruction
+bool is_instruction(char ch) {
+    const std::string instructions = ",.[]{}<>+-";
+    return instructions.find(ch) != std::string::npos;
+}
 
 struct DarwinConfig {
     int grid_width;        // W (width of each half)
@@ -90,7 +97,71 @@ void run_simulation_pair(
     result = emulate(tape, 0, program_size);
 }
 
-void evolve_grid_epoch(
+void save_pairing_data(
+    const std::string& filepath,
+    int epoch,
+    const Grid& grid,
+    const std::vector<std::pair<int, int>>& program_pairs
+) {
+    std::ofstream pairing_file(filepath);
+    if (!pairing_file.is_open()) return;
+
+    // Build pairing map
+    std::map<int, int> pairing_map;
+    for (const auto& pair : program_pairs) {
+        int idx_a = pair.first;
+        int idx_b = pair.second;
+
+        if (idx_a == -1) {
+            pairing_map[idx_b] = -1;  // Mutation-only
+        } else {
+            pairing_map[idx_a] = idx_b;  // Paired
+            pairing_map[idx_b] = idx_a;
+        }
+    }
+
+    // Get all programs
+    auto soup = grid.get_all_programs();
+
+    // Write header
+    pairing_file << "epoch,position_x,position_y,program,combined_x,combined_y\n";
+
+    // Write data for each position
+    for (int y = 0; y < grid.get_height(); y++) {
+        for (int x = 0; x < grid.get_width(); x++) {
+            int idx = y * grid.get_width() + x;
+            const auto& program = soup[idx];
+
+            // Get combined position
+            int combined_idx = pairing_map[idx];
+            int combined_x = -1;
+            int combined_y = -1;
+
+            if (combined_idx >= 0) {
+                combined_y = combined_idx / grid.get_width();
+                combined_x = combined_idx % grid.get_width();
+            }
+
+            // Write row
+            pairing_file << epoch << ","
+                        << x << ","
+                        << y << ",\"";
+
+            // Write program as string (clean non-instructions)
+            for (uint8_t ch : program) {
+                char clean_ch = is_instruction(static_cast<char>(ch)) ?
+                              static_cast<char>(ch) : ' ';
+                pairing_file << clean_ch;
+            }
+
+            pairing_file << "\"," << combined_x << "," << combined_y << "\n";
+        }
+    }
+
+    pairing_file.close();
+}
+
+std::vector<std::pair<int, int>> evolve_grid_epoch(
     Grid& grid,
     const Config& config,
     std::vector<EmulatorResult>& results,
@@ -179,6 +250,7 @@ void evolve_grid_epoch(
     }
 
     grid.set_all_programs(soup);
+    return program_pairs;
 }
 
 int main(int argc, char* argv[]) {
@@ -234,6 +306,12 @@ int main(int argc, char* argv[]) {
 
     // Create output directories
     system("mkdir -p data/visualizations/darwin");
+    system("mkdir -p data/pairings/darwin/left");
+    system("mkdir -p data/pairings/darwin/right");
+    system("mkdir -p data/pairings/darwin/merged");
+
+    // Hardcoded pairing save start epoch
+    const int PAIRING_START_EPOCH = 0;  // Save from beginning for Darwin
 
     // PHASE 1: Independent evolution (0 to t1)
     std::cout << "--- PHASE 1: BARRIER IN PLACE ---" << std::endl;
@@ -254,12 +332,24 @@ int main(int argc, char* argv[]) {
         double right_iters, right_skips, right_finished, right_terminated;
 
         // Evolve left grid
-        evolve_grid_epoch(left_grid, left_config, left_results,
+        auto left_pairs = evolve_grid_epoch(left_grid, left_config, left_results,
                          left_iters, left_skips, left_finished, left_terminated, left_rng);
 
         // Evolve right grid
-        evolve_grid_epoch(right_grid, right_config, right_results,
+        auto right_pairs = evolve_grid_epoch(right_grid, right_config, right_results,
                          right_iters, right_skips, right_finished, right_terminated, right_rng);
+
+        // Save pairing information for both grids
+        if (epoch + 1 >= PAIRING_START_EPOCH) {
+            std::stringstream left_path, right_path;
+            left_path << "data/pairings/darwin/left/pairings_epoch_"
+                     << std::setfill('0') << std::setw(4) << (epoch + 1) << ".csv";
+            right_path << "data/pairings/darwin/right/pairings_epoch_"
+                      << std::setfill('0') << std::setw(4) << (epoch + 1) << ".csv";
+
+            save_pairing_data(left_path.str(), epoch + 1, left_grid, left_pairs);
+            save_pairing_data(right_path.str(), epoch + 1, right_grid, right_pairs);
+        }
 
         // Calculate combined stats
         std::vector<uint8_t> left_flat, right_flat;
@@ -358,8 +448,17 @@ int main(int argc, char* argv[]) {
         std::vector<EmulatorResult> results;
         double total_iters, total_skips, finished, terminated;
 
-        evolve_grid_epoch(merged_grid, merged_config, results,
+        auto merged_pairs = evolve_grid_epoch(merged_grid, merged_config, results,
                          total_iters, total_skips, finished, terminated, merged_rng);
+
+        // Save pairing information for merged grid
+        if (epoch + 1 >= PAIRING_START_EPOCH) {
+            std::stringstream merged_path;
+            merged_path << "data/pairings/darwin/merged/pairings_epoch_"
+                       << std::setfill('0') << std::setw(4) << (epoch + 1) << ".csv";
+
+            save_pairing_data(merged_path.str(), epoch + 1, merged_grid, merged_pairs);
+        }
 
         // Calculate stats for full merged grid
         std::vector<uint8_t> flat_soup;
