@@ -229,10 +229,13 @@ add_executable(forward_pass_analysis
     src/forward_pass_analysis.cpp
     src/emulator.cpp
     src/utils.cpp
+    src/metrics.cpp
 )
 
 # Link libraries
-target_link_libraries(forward_pass_analysis pthread)
+target_link_libraries(forward_pass_analysis ${BROTLI_LIBRARIES} pthread)
+target_include_directories(forward_pass_analysis PRIVATE ${BROTLI_INCLUDE_DIRS})
+target_compile_options(forward_pass_analysis PRIVATE ${BROTLI_CFLAGS_OTHER})
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(forward_pass_analysis PRIVATE -Wall -Wextra -O3)
 endif()
