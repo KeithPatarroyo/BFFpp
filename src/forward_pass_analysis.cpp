@@ -593,9 +593,9 @@ int main(int argc, char* argv[]) {
     std::cout << "\nTotal replicators found: " << total_replicators << std::endl;
     std::cout << "Unique replicator programs: " << unique_programs.size() << std::endl;
 
-    // Calculate compression distances for each unique replicator
-    std::cout << "\nCalculating compression distances..." << std::endl;
-    std::map<std::string, double> compression_distances;
+    // Calculate edit distances for each unique replicator
+    std::cout << "\nCalculating edit distances..." << std::endl;
+    std::map<std::string, double> edit_distances;
 
     // Find the replicator with label 0 (the first discovered replicator)
     std::string reference_replicator;
@@ -607,46 +607,27 @@ int main(int argc, char* argv[]) {
     }
 
     if (!reference_replicator.empty()) {
-        // Convert to vector<uint8_t> for compression
-        std::vector<uint8_t> rep_x(reference_replicator.begin(), reference_replicator.end());
-        double C_rep_x = compressed_size(rep_x);
-
         // Reference replicator (label 0) has distance 0
-        compression_distances[reference_replicator] = 0.0;
+        edit_distances[reference_replicator] = 0.0;
 
         // Calculate distance for all other unique replicators
         for (const auto& program : unique_programs) {
             if (program == reference_replicator) continue;
 
-            std::vector<uint8_t> rep_y(program.begin(), program.end());
-            double C_rep_y = compressed_size(rep_y);
-
-            // Concatenate rep_x and rep_y
-            std::vector<uint8_t> concatenated = rep_x;
-            concatenated.insert(concatenated.end(), rep_y.begin(), rep_y.end());
-            double C_concat = compressed_size(concatenated);
-
-            // Calculate compression distance
-            double min_C = std::min(C_rep_x, C_rep_y);
-            double max_C = std::max(C_rep_x, C_rep_y);
-
-            if (max_C > 0) {
-                compression_distances[program] = (C_concat - min_C) / max_C;
-            } else {
-                compression_distances[program] = 0.0;
-            }
+            // Calculate normalized edit distance
+            edit_distances[program] = normalized_edit_distance(reference_replicator, program);
         }
     }
 
     std::cout << "\nUnique replicator programs:" << std::endl;
     for (const auto& program : unique_programs) {
         int label = program_to_label[program];
-        double distance = compression_distances[program];
+        double distance = edit_distances[program];
         const auto& first = first_appearance[program];
         std::cout << "  [" << label << "] " << program << std::endl;
         std::cout << "      First appeared at epoch " << first.epoch
                   << ", position (" << first.grid_x << ", " << first.grid_y << ")" << std::endl;
-        std::cout << "      Compression distance: " << std::fixed << std::setprecision(4) << distance << std::endl;
+        std::cout << "      Edit distance: " << std::fixed << std::setprecision(4) << distance << std::endl;
     }
 
     // Generate evolutionary tree visualization
@@ -879,16 +860,16 @@ int main(int argc, char* argv[]) {
         std::cout << "Evolutionary tree saved to: " << viz_path << std::endl;
     }
 
-    // Generate compression distance plot
-    std::cout << "Generating compression distance plot..." << std::endl;
+    // Generate edit distance plot
+    std::cout << "Generating edit distance plot..." << std::endl;
 
-    std::string dist_viz_path = pairings_dir + "/compression_distance_tree.html";
+    std::string dist_viz_path = pairings_dir + "/edit_distance_tree.html";
     std::ofstream dist_viz_file(dist_viz_path);
     if (dist_viz_file.is_open()) {
         dist_viz_file << R"(<!DOCTYPE html>
 <html>
 <head>
-    <title>Replicator Compression Distance Tree</title>
+    <title>Replicator Edit Distance Tree</title>
     <style>
         body {
             font-family: 'Courier New', monospace;
@@ -916,15 +897,15 @@ int main(int argc, char* argv[]) {
     </style>
 </head>
 <body>
-    <h1>Replicator Compression Distance Tree</h1>
+    <h1>Replicator Edit Distance Tree</h1>
     <canvas id="canvas"></canvas>
     <div class="info">
         <h2>Legend</h2>
         <p>X-axis: Epoch (time)</p>
-        <p>Y-axis: Compression Distance from first replicator</p>
+        <p>Y-axis: Normalized Edit Distance from first replicator</p>
         <p>Dots: Replicator present at that epoch</p>
         <p>Lines: Evolutionary connections (parent → child)</p>
-        <p>Distance formula: (C(xy) - min(C(x),C(y))) / max(C(x),C(y))</p>
+        <p>Distance formula: Levenshtein distance / max(len(s1), len(s2))</p>
     </div>
     <script>
         const canvas = document.getElementById('canvas');
@@ -934,7 +915,7 @@ int main(int argc, char* argv[]) {
         const data = {
 )";
 
-        // Output epoch data with compression distances
+        // Output epoch data with edit distances
         dist_viz_file << "            epochs: [\n";
         bool first_epoch_dist = true;
         for (const auto& [epoch, reps] : replicators) {
@@ -946,15 +927,15 @@ int main(int argc, char* argv[]) {
 
             // Collect distances for this epoch
             for (const auto& rep : reps) {
-                double distance = compression_distances[rep.program];
+                double distance = edit_distances[rep.program];
                 distances_at_epoch.insert(distance);
             }
 
-            // Calculate edges using compression distances
+            // Calculate edges using edit distances
             if (epoch != start_epoch) {
                 const auto& prev_epoch_reps = replicators.at(epoch - 1);
                 for (const auto& rep : reps) {
-                    double child_distance = compression_distances[rep.program];
+                    double child_distance = edit_distances[rep.program];
 
                     for (const auto& prev_rep : prev_epoch_reps) {
                         int dx = std::abs(rep.grid_x - prev_rep.grid_x);
@@ -963,7 +944,7 @@ int main(int argc, char* argv[]) {
                         bool is_neighbor = (manhattan <= 2) || (dx == 1 && dy == 1);
 
                         if (is_neighbor || (rep.grid_x == prev_rep.grid_x && rep.grid_y == prev_rep.grid_y)) {
-                            double parent_distance = compression_distances[prev_rep.program];
+                            double parent_distance = edit_distances[prev_rep.program];
                             edges_with_distances.insert({parent_distance, child_distance});
                         }
                     }
@@ -1000,7 +981,7 @@ int main(int argc, char* argv[]) {
             first_prog_dist = false;
 
             const auto& first = first_appearance[program];
-            double distance = compression_distances[program];
+            double distance = edit_distances[program];
             dist_viz_file << "                \"" << label << "\": {\n";
             dist_viz_file << "                    program: \"" << program << "\",\n";
             dist_viz_file << "                    distance: " << std::fixed << std::setprecision(6) << distance << ",\n";
@@ -1136,7 +1117,7 @@ int main(int argc, char* argv[]) {
 </html>
 )";
         dist_viz_file.close();
-        std::cout << "Compression distance tree saved to: " << dist_viz_path << std::endl;
+        std::cout << "Edit distance tree saved to: " << dist_viz_path << std::endl;
     }
 
     // Save results to file
