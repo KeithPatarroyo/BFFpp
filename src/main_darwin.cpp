@@ -55,6 +55,41 @@ Grid create_combined_grid(const Grid& left_grid, const Grid& right_grid, int bar
     return combined;
 }
 
+// Helper function to save combined grid with yellow barrier
+void save_combined_grid_with_barrier(const Grid& combined_grid, int barrier_start_x, int barrier_width, const std::string& filename) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        throw std::runtime_error("Could not open file: " + filename);
+    }
+
+    int width = combined_grid.get_width();
+    int height = combined_grid.get_height();
+
+    // PPM header
+    file << "P3\n";
+    file << width << " " << height << "\n";
+    file << "255\n";
+
+    // Write pixel data
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            // Check if this is a barrier pixel
+            if (x >= barrier_start_x && x < barrier_start_x + barrier_width) {
+                // Yellow barrier
+                file << "255 255 0 ";
+            } else {
+                RGB color = combined_grid.program_to_color(combined_grid.get_program(x, y));
+                file << static_cast<int>(color.r) << " "
+                     << static_cast<int>(color.g) << " "
+                     << static_cast<int>(color.b) << " ";
+            }
+        }
+        file << "\n";
+    }
+
+    file.close();
+}
+
 struct DarwinConfig {
     int grid_width;        // W (width of each half)
     int grid_height;       // H (height)
@@ -463,8 +498,8 @@ int main(int argc, char* argv[]) {
             std::stringstream frame_path;
             frame_path << "data/visualizations/darwin/frames/frame_"
                       << std::setfill('0') << std::setw(6) << epoch << ".ppm";
-            Grid combined = create_combined_grid(left_grid, right_grid);
-            combined.save_ppm(frame_path.str());
+            Grid combined = create_combined_grid(left_grid, right_grid, 2);
+            save_combined_grid_with_barrier(combined, darwin_config.grid_width, 2, frame_path.str());
         }
     }
 
@@ -473,8 +508,8 @@ int main(int argc, char* argv[]) {
         std::stringstream frame_path;
         frame_path << "data/visualizations/darwin/frames/frame_"
                   << std::setfill('0') << std::setw(6) << (darwin_config.barrier_removal_epoch - 1) << ".ppm";
-        Grid combined = create_combined_grid(left_grid, right_grid);
-        combined.save_ppm(frame_path.str());
+        Grid combined = create_combined_grid(left_grid, right_grid, 2);
+        save_combined_grid_with_barrier(combined, darwin_config.grid_width, 2, frame_path.str());
         std::cout << "Saved final frame before barrier removal" << std::endl;
     }
 
