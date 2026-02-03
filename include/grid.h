@@ -37,7 +37,7 @@ public:
     RGB program_to_color(const std::vector<uint8_t>& program) const;
 
     // Save grid as PPM image
-    void save_ppm(const std::string& filename) const;
+    void save_ppm(const std::string& filename, int scale = 4) const;
 
     // Generate HTML visualization
     void save_html(const std::string& filename) const;

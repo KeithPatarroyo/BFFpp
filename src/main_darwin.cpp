@@ -56,7 +56,7 @@ Grid create_combined_grid(const Grid& left_grid, const Grid& right_grid, int bar
 }
 
 // Helper function to save combined grid with yellow barrier
-void save_combined_grid_with_barrier(const Grid& combined_grid, int barrier_start_x, int barrier_width, const std::string& filename) {
+void save_combined_grid_with_barrier(const Grid& combined_grid, int barrier_start_x, int barrier_width, const std::string& filename, int scale = 4) {
     std::ofstream file(filename);
     if (!file.is_open()) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -67,24 +67,26 @@ void save_combined_grid_with_barrier(const Grid& combined_grid, int barrier_star
 
     // PPM header
     file << "P3\n";
-    file << width << " " << height << "\n";
+    file << (width * scale) << " " << (height * scale) << "\n";
     file << "255\n";
 
-    // Write pixel data
+    // Write pixel data, each cell scaled to scale x scale pixels
     for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            // Check if this is a barrier pixel
-            if (x >= barrier_start_x && x < barrier_start_x + barrier_width) {
-                // Yellow barrier
-                file << "255 255 0 ";
-            } else {
-                RGB color = combined_grid.program_to_color(combined_grid.get_program(x, y));
-                file << static_cast<int>(color.r) << " "
-                     << static_cast<int>(color.g) << " "
-                     << static_cast<int>(color.b) << " ";
+        for (int sy = 0; sy < scale; sy++) {
+            for (int x = 0; x < width; x++) {
+                for (int sx = 0; sx < scale; sx++) {
+                    if (x >= barrier_start_x && x < barrier_start_x + barrier_width) {
+                        file << "255 255 0 ";
+                    } else {
+                        RGB color = combined_grid.program_to_color(combined_grid.get_program(x, y));
+                        file << static_cast<int>(color.r) << " "
+                             << static_cast<int>(color.g) << " "
+                             << static_cast<int>(color.b) << " ";
+                    }
+                }
             }
+            file << "\n";
         }
-        file << "\n";
     }
 
     file.close();
