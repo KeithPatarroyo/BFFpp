@@ -115,7 +115,7 @@ RGB Grid::program_to_color(const std::vector<uint8_t>& program) const {
     return RGB{r, g, b};
 }
 
-void Grid::save_ppm(const std::string& filename) const {
+void Grid::save_ppm(const std::string& filename, int scale) const {
     std::ofstream file(filename);
     if (!file.is_open()) {
         throw std::runtime_error("Could not open file: " + filename);
@@ -123,18 +123,22 @@ void Grid::save_ppm(const std::string& filename) const {
 
     // PPM header
     file << "P3\n";
-    file << width << " " << height << "\n";
+    file << (width * scale) << " " << (height * scale) << "\n";
     file << "255\n";
 
-    // Write pixel data
+    // Write pixel data, each cell scaled to scale x scale pixels
     for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            RGB color = program_to_color(get_program(x, y));
-            file << static_cast<int>(color.r) << " "
-                 << static_cast<int>(color.g) << " "
-                 << static_cast<int>(color.b) << " ";
+        for (int sy = 0; sy < scale; sy++) {
+            for (int x = 0; x < width; x++) {
+                RGB color = program_to_color(get_program(x, y));
+                for (int sx = 0; sx < scale; sx++) {
+                    file << static_cast<int>(color.r) << " "
+                         << static_cast<int>(color.g) << " "
+                         << static_cast<int>(color.b) << " ";
+                }
+            }
+            file << "\n";
         }
-        file << "\n";
     }
 
     file.close();
