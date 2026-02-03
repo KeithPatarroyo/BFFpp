@@ -21,6 +21,40 @@ bool is_instruction(char ch) {
     return instructions.find(ch) != std::string::npos;
 }
 
+// Helper function to create a merged grid from left and right grids with a barrier
+Grid create_combined_grid(const Grid& left_grid, const Grid& right_grid, int barrier_width = 2) {
+    int width = left_grid.get_width();
+    int height = left_grid.get_height();
+    int program_size = left_grid.get_program_size();
+
+    // Create a grid that's wide enough for both grids plus barrier
+    Grid combined(width * 2 + barrier_width, height, program_size);
+
+    // Copy left grid
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            combined.set_program(x, y, left_grid.get_program(x, y));
+        }
+    }
+
+    // Set barrier (white/empty programs)
+    std::vector<uint8_t> barrier_program(program_size, 0);
+    for (int y = 0; y < height; y++) {
+        for (int b = 0; b < barrier_width; b++) {
+            combined.set_program(width + b, y, barrier_program);
+        }
+    }
+
+    // Copy right grid
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            combined.set_program(width + barrier_width + x, y, right_grid.get_program(x, y));
+        }
+    }
+
+    return combined;
+}
+
 struct DarwinConfig {
     int grid_width;        // W (width of each half)
     int grid_height;       // H (height)
@@ -306,6 +340,7 @@ int main(int argc, char* argv[]) {
 
     // Create output directories
     system("mkdir -p data/visualizations/darwin");
+    system("mkdir -p data/visualizations/darwin/frames");
     system("mkdir -p data/pairings/darwin/left");
     system("mkdir -p data/pairings/darwin/right");
     system("mkdir -p data/pairings/darwin/merged");
@@ -422,6 +457,25 @@ int main(int argc, char* argv[]) {
                       << ", Avg Iters=" << right_iters
                       << ", Finished=" << right_finished << std::endl;
         }
+
+        // Save frame for video
+        if (epoch % darwin_config.visualization_interval == 0) {
+            std::stringstream frame_path;
+            frame_path << "data/visualizations/darwin/frames/frame_"
+                      << std::setfill('0') << std::setw(6) << epoch << ".ppm";
+            Grid combined = create_combined_grid(left_grid, right_grid);
+            combined.save_ppm(frame_path.str());
+        }
+    }
+
+    // Save final frame before barrier removal
+    {
+        std::stringstream frame_path;
+        frame_path << "data/visualizations/darwin/frames/frame_"
+                  << std::setfill('0') << std::setw(6) << (darwin_config.barrier_removal_epoch - 1) << ".ppm";
+        Grid combined = create_combined_grid(left_grid, right_grid);
+        combined.save_ppm(frame_path.str());
+        std::cout << "Saved final frame before barrier removal" << std::endl;
     }
 
     std::cout << "\n--- BARRIER REMOVED AT EPOCH " << darwin_config.barrier_removal_epoch << " ---\n" << std::endl;
@@ -435,6 +489,15 @@ int main(int argc, char* argv[]) {
             merged_grid.set_program(x, y, left_grid.get_program(x, y));
             merged_grid.set_program(x + darwin_config.grid_width, y, right_grid.get_program(x, y));
         }
+    }
+
+    // Save first frame after barrier removal
+    {
+        std::stringstream frame_path;
+        frame_path << "data/visualizations/darwin/frames/frame_"
+                  << std::setfill('0') << std::setw(6) << darwin_config.barrier_removal_epoch << ".ppm";
+        merged_grid.save_ppm(frame_path.str());
+        std::cout << "Saved first frame after barrier removal" << std::endl;
     }
 
     std::cout << "--- PHASE 2: POPULATIONS MIXING ---" << std::endl;
@@ -509,6 +572,23 @@ int main(int argc, char* argv[]) {
                       << ", Avg Iters=" << total_iters
                       << ", Finished=" << finished << std::endl;
         }
+
+        // Save frame for video
+        if (epoch % darwin_config.visualization_interval == 0) {
+            std::stringstream frame_path;
+            frame_path << "data/visualizations/darwin/frames/frame_"
+                      << std::setfill('0') << std::setw(6) << epoch << ".ppm";
+            merged_grid.save_ppm(frame_path.str());
+        }
+    }
+
+    // Save final frame after evolution
+    {
+        std::stringstream frame_path;
+        frame_path << "data/visualizations/darwin/frames/frame_"
+                  << std::setfill('0') << std::setw(6) << (darwin_config.final_epoch - 1) << ".ppm";
+        merged_grid.save_ppm(frame_path.str());
+        std::cout << "Saved final frame after evolution" << std::endl;
     }
 
     std::cout << "\n=== DARWIN EXPERIMENT COMPLETE ===" << std::endl;
@@ -579,6 +659,28 @@ int main(int argc, char* argv[]) {
     }
 
     std::cout << "\nEntropy tracking complete!" << std::endl;
+
+    // Generate video from frames
+    std::cout << "\nGenerating video from frames..." << std::endl;
+
+    // Convert PPM frames to PNG using ffmpeg (ffmpeg can handle PPM directly too)
+    std::cout << "Creating video with ffmpeg..." << std::endl;
+    std::stringstream ffmpeg_cmd;
+    ffmpeg_cmd << "ffmpeg -y -framerate 10 -pattern_type glob -i 'data/visualizations/darwin/frames/frame_*.ppm' "
+               << "-c:v libx264 -pix_fmt yuv420p -crf 23 "
+               << "data/visualizations/darwin/evolution_video.mp4 2>&1 | grep -E '(frame=|error|Duration)'";
+
+    int result = system(ffmpeg_cmd.str().c_str());
+    if (result == 0) {
+        std::cout << "Video saved to: data/visualizations/darwin/evolution_video.mp4" << std::endl;
+    } else {
+        std::cout << "Warning: ffmpeg may not be installed or video generation failed" << std::endl;
+        std::cout << "You can manually create the video using:" << std::endl;
+        std::cout << "  ffmpeg -framerate 10 -pattern_type glob -i 'data/visualizations/darwin/frames/frame_*.ppm' "
+                  << "-c:v libx264 -pix_fmt yuv420p data/visualizations/darwin/evolution_video.mp4" << std::endl;
+    }
+
+    std::cout << "\nDarwin experiment complete!" << std::endl;
 
     return 0;
 }
